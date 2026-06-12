@@ -7,9 +7,8 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.patches import FancyArrowPatch, Circle, Polygon
+from matplotlib.patches import Polygon, Circle
 import io
-import time
 
 # ============================================================================
 # PAGE CONFIG
@@ -17,173 +16,154 @@ import time
 
 st.set_page_config(
     page_title="2D Truss Analyzer",
-    page_icon="",
+    page_icon="🔧",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Clean modern styling - no forced theme
+# ============================================================================
+# STYLING - Clean, modern, no emojis in titles
+# ============================================================================
+
 st.markdown("""
 <style>
-    /* Clean inputs */
+    /* Clean dark inputs and cards - but respect system background */
     .stTextInput input, .stNumberInput input {
+        background-color: var(--st-color-secondary-bg) !important;
+        border: 1px solid var(--st-color-border) !important;
         border-radius: 8px !important;
-        border: 1px solid #d0d5dd !important;
         padding: 0.5rem 0.75rem !important;
         font-size: 0.95rem !important;
         transition: border-color 0.2s, box-shadow 0.2s !important;
     }
-    
     .stTextInput input:focus, .stNumberInput input:focus {
-        border-color: #2563eb !important;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+        border-color: #4a90e2 !important;
+        box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15) !important;
         outline: none !important;
     }
     
     /* Buttons */
     .stButton > button {
-        border-radius: 8px !important;
+        background: #1e3c72 !important;
+        color: white !important;
         font-weight: 500 !important;
-        padding: 0.5rem 1.25rem !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1.5rem !important;
         transition: all 0.15s !important;
-        border: 1px solid #d0d5dd !important;
-        background: #ffffff !important;
-        color: #1a1a1a !important;
+        letter-spacing: 0.2px !important;
     }
-    
     .stButton > button:hover {
-        border-color: #2563eb !important;
-        background: #f8faff !important;
+        background: #2a5298 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(30, 60, 114, 0.4) !important;
     }
-    
     .stButton > button:active {
-        background: #eef2ff !important;
+        transform: translateY(0) !important;
     }
     
     /* Primary button */
     .stButton > button[kind="primary"] {
-        background: #2563eb !important;
-        color: white !important;
-        border-color: #2563eb !important;
+        background: #2a5298 !important;
     }
     
-    .stButton > button[kind="primary"]:hover {
-        background: #1d4ed8 !important;
+    /* Danger/delete styling */
+    .delete-btn > button {
+        background: transparent !important;
+        color: #e74c3c !important;
+        border: 1px solid #e74c3c !important;
+    }
+    .delete-btn > button:hover {
+        background: rgba(231, 76, 60, 0.1) !important;
     }
     
-    /* Danger button */
-    .danger-button > button {
-        color: #dc2626 !important;
-        border-color: #fca5a5 !important;
-    }
-    
-    .danger-button > button:hover {
-        background: #fef2f2 !important;
-        border-color: #dc2626 !important;
-    }
-    
-    /* Dataframe */
+    /* Dataframe styling */
     .stDataFrame {
-        border: 1px solid #e5e7eb !important;
+        border: 1px solid var(--st-color-border) !important;
         border-radius: 10px !important;
         overflow: hidden !important;
     }
-    
-    .stDataFrame th {
-        background: #f9fafb !important;
+    .stDataFrame [data-testid="stTable"] th {
         font-weight: 600 !important;
-        font-size: 0.8rem !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.5px !important;
-        color: #6b7280 !important;
-        border-bottom: 2px solid #e5e7eb !important;
-        padding: 0.6rem 0.75rem !important;
+        font-size: 0.85rem !important;
+        letter-spacing: 0.3px !important;
+        padding: 0.6rem 0.8rem !important;
     }
-    
-    .stDataFrame td {
-        padding: 0.5rem 0.75rem !important;
+    .stDataFrame [data-testid="stTable"] td {
+        padding: 0.5rem 0.8rem !important;
         font-size: 0.9rem !important;
-        border-bottom: 1px solid #f3f4f6 !important;
-    }
-    
-    .stDataFrame tr:hover td {
-        background: #f9fafb !important;
-        cursor: pointer !important;
-    }
-    
-    /* Selected row */
-    .stDataFrame tr[aria-selected="true"] td {
-        background: #eff6ff !important;
     }
     
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px !important;
-        background: #f3f4f6 !important;
-        border-radius: 10px !important;
-        padding: 3px !important;
+        background: transparent !important;
     }
-    
     .stTabs [data-baseweb="tab"] {
-        border-radius: 8px !important;
-        padding: 0.5rem 1rem !important;
-        font-size: 0.85rem !important;
+        border-radius: 8px 8px 0 0 !important;
+        padding: 0.6rem 1.2rem !important;
         font-weight: 500 !important;
-        color: #6b7280 !important;
+        font-size: 0.9rem !important;
+        letter-spacing: 0.2px !important;
     }
-    
     .stTabs [aria-selected="true"] {
-        background: white !important;
-        color: #2563eb !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+        background: #1e3c72 !important;
+        color: white !important;
     }
     
     /* Cards */
     .card {
-        background: white;
-        border: 1px solid #e5e7eb;
+        border: 1px solid var(--st-color-border);
         border-radius: 12px;
         padding: 1.25rem;
+        margin-bottom: 0.75rem;
     }
     
     /* Title */
     .app-title {
-        font-size: 1.75rem;
+        font-size: 1.8rem;
         font-weight: 700;
-        color: #1a1a1a;
+        text-align: center;
+        margin-bottom: 0;
         letter-spacing: -0.3px;
+        color: #1e3c72;
     }
     
-    /* Section label */
+    /* Section titles */
     .section-label {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: #9ca3af;
+        letter-spacing: 0.5px;
+        color: #8b949e;
         margin-bottom: 0.5rem;
     }
     
-    /* Hide Streamlit branding */
-    #MainMenu, footer, header {visibility: hidden;}
-    
-    /* Smooth scroll */
-    html {scroll-behavior: smooth;}
-    
-    /* Number input - remove spinners */
-    input[type="number"]::-webkit-inner-spin-button,
-    input[type="number"]::-webkit-outer-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-    input[type="number"] {
-        -moz-appearance: textfield;
+    /* Table row hover */
+    .stDataFrame tr:hover td {
+        cursor: pointer !important;
+        background-color: rgba(74, 144, 226, 0.08) !important;
     }
     
-    /* Placeholder styling */
-    input::placeholder {
-        color: #d1d5db !important;
-        font-style: italic;
+    /* Selected row */
+    .stDataFrame tr[aria-selected="true"] td {
+        background-color: rgba(74, 144, 226, 0.15) !important;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
+    
+    /* Spinner */
+    .stSpinner > div {
+        border-color: #4a90e2 !important;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .app-title { font-size: 1.4rem; }
+        .stTabs [data-baseweb="tab"] { padding: 0.5rem 0.8rem; font-size: 0.8rem; }
     }
 </style>
 
@@ -194,422 +174,398 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================================
-# LANGUAGE
+# LANGUAGE SYSTEM - Clean, no emojis in titles
 # ============================================================================
 
 LANG = {
     "English": {
         "title": "2D Truss Analyzer",
         "language": "Language",
-        "live_preview": "Preview",
-        "nodes": "Nodes",
-        "members": "Members",
-        "supports": "Supports",
-        "loads": "Loads",
+        "preview": "Preview",
+        "nodes_tab": "Nodes",
+        "members_tab": "Members",
+        "supports_tab": "Supports",
+        "loads_tab": "Loads",
         "analyze": "Analyze",
         "reset": "Reset",
-        "node_name": "Node name",
-        "x_coord": "X coordinate",
-        "y_coord": "Y coordinate",
-        "add_node": "Add node",
-        "start_node": "Start node",
-        "end_node": "End node",
-        "add_member": "Add member",
+        "node_name": "Name",
+        "x_coord": "X (m)",
+        "y_coord": "Y (m)",
+        "add_node": "Add",
+        "update_node": "Update",
+        "delete_node": "Delete",
+        "start_node": "Start",
+        "end_node": "End",
+        "add_member": "Add",
+        "update_member": "Update",
+        "delete_member": "Delete",
         "support_node": "Node",
-        "support_type": "Support type",
-        "support_types": ["Pinned", "Roller (free X)", "Roller (free Y)"],
-        "add_support": "Add support",
-        "remove_support": "Remove support",
-        "load_type": "Load type",
-        "load_types": ["On node", "On member"],
-        "load_node": "Node",
+        "support_type": "Type",
+        "support_types": ["Pinned", "Roller X", "Roller Y"],
+        "add_support": "Add",
+        "delete_support": "Delete",
+        "load_type": "Type",
+        "load_types": ["On Node", "On Member"],
+        "load_name": "Name",
+        "load_location": "Location",
         "load_member": "Member",
-        "load_position": "Position along member",
-        "load_position_hint": "0 = start, 0.5 = middle, 1 = end",
-        "load_magnitude": "Magnitude",
-        "load_angle": "Angle from +X",
-        "add_load": "Add load",
-        "remove_load": "Remove selected",
+        "load_position": "Position",
+        "load_magnitude": "Force (kN)",
+        "load_angle": "Angle",
+        "add_load": "Add",
+        "delete_load": "Delete",
         "nodes_table": "Nodes",
         "members_table": "Members",
         "supports_table": "Supports",
         "loads_table": "Loads",
-        "tap_to_edit": "Tap a row to edit",
-        "hold_to_delete": "Tap a row, then press Delete below",
-        "delete_selected": "Delete selected",
-        "reactions": "Support reactions",
-        "member_forces": "Member forces",
+        "click_to_edit": "Click row to edit",
+        "reactions": "Reactions",
+        "member_forces": "Member Forces",
         "displacements": "Displacements",
-        "node": "Node",
-        "fx": "Fx",
-        "fy": "Fy",
-        "resultant": "R",
+        "node_col": "Node",
+        "fx": "Fx (kN)",
+        "fy": "Fy (kN)",
+        "resultant": "R (kN)",
         "angle": "Angle",
-        "member": "Member",
-        "length": "Length",
-        "force": "Force",
+        "member_col": "Member",
+        "length_col": "Length (m)",
+        "force_col": "Force (kN)",
         "type": "Type",
         "tension": "Tension",
         "compression": "Compression",
-        "ux": "Ux",
-        "uy": "Uy",
-        "units_reaction": "kN",
-        "units_force": "kN",
-        "units_disp": "mm",
-        "units_length": "m",
-        "no_data": "Add nodes and members, then press Analyze.",
-        "need_minimum": "At least 2 nodes and 1 member required.",
-        "analysis_error": "Analysis failed. Check supports and geometry.",
-        "legend_tension": "Tension",
-        "legend_compression": "Compression",
-        "legend_load": "Applied load",
-        "legend_reaction": "Reaction",
-        "export": "Export results",
+        "ux": "Ux (mm)",
+        "uy": "Uy (mm)",
+        "no_data": "No data yet",
+        "need_min": "Add at least 2 nodes and 1 member to analyze",
+        "error_analysis": "Analysis failed. Check supports and geometry.",
+        "legend": "Blue = Tension  |  Red = Compression  |  Green = Load  |  Orange = Reaction",
+        "export": "Export Results",
+        "length": "Length",
     },
     "Persian": {
         "title": "تحلیل‌گر خرپا دوبعدی",
         "language": "زبان",
-        "live_preview": "پیش‌نمایش",
-        "nodes": "گره‌ها",
-        "members": "اعضا",
-        "supports": "تکیه‌گاه‌ها",
-        "loads": "بارها",
+        "preview": "پیش‌نمایش",
+        "nodes_tab": "گره‌ها",
+        "members_tab": "اعضا",
+        "supports_tab": "تکیه‌گاه‌ها",
+        "loads_tab": "بارها",
         "analyze": "تحلیل",
         "reset": "بازنشانی",
-        "node_name": "نام گره",
-        "x_coord": "مختصات X",
-        "y_coord": "مختصات Y",
-        "add_node": "افزودن گره",
-        "start_node": "گره آغاز",
-        "end_node": "گره پایان",
-        "add_member": "افزودن عضو",
+        "node_name": "نام",
+        "x_coord": "X (متر)",
+        "y_coord": "Y (متر)",
+        "add_node": "افزودن",
+        "update_node": "ویرایش",
+        "delete_node": "حذف",
+        "start_node": "شروع",
+        "end_node": "پایان",
+        "add_member": "افزودن",
+        "update_member": "ویرایش",
+        "delete_member": "حذف",
         "support_node": "گره",
-        "support_type": "نوع تکیه‌گاه",
-        "support_types": ["گیردار", "غلتک (آزاد X)", "غلتک (آزاد Y)"],
-        "add_support": "افزودن تکیه‌گاه",
-        "remove_support": "حذف تکیه‌گاه",
-        "load_type": "نوع بار",
+        "support_type": "نوع",
+        "support_types": ["گیردار", "غلتک X", "غلتک Y"],
+        "add_support": "افزودن",
+        "delete_support": "حذف",
+        "load_type": "نوع",
         "load_types": ["روی گره", "روی عضو"],
-        "load_node": "گره",
+        "load_name": "نام",
+        "load_location": "محل",
         "load_member": "عضو",
-        "load_position": "موقعیت روی عضو",
-        "load_position_hint": "0 = آغاز, 0.5 = وسط, 1 = پایان",
-        "load_magnitude": "بزرگی",
-        "load_angle": "زاویه از +X",
-        "add_load": "افزودن بار",
-        "remove_load": "حذف انتخاب",
+        "load_position": "موقعیت",
+        "load_magnitude": "نیرو (kN)",
+        "load_angle": "زاویه",
+        "add_load": "افزودن",
+        "delete_load": "حذف",
         "nodes_table": "گره‌ها",
         "members_table": "اعضا",
         "supports_table": "تکیه‌گاه‌ها",
         "loads_table": "بارها",
-        "tap_to_edit": "برای ویرایش روی یک ردیف بزنید",
-        "hold_to_delete": "روی ردیف بزنید، سپس دکمه حذف را بفشارید",
-        "delete_selected": "حذف انتخاب",
-        "reactions": "عکس‌العمل‌های تکیه‌گاهی",
+        "click_to_edit": "برای ویرایش کلیک کنید",
+        "reactions": "عکس‌العمل‌ها",
         "member_forces": "نیروهای اعضا",
         "displacements": "جابجایی‌ها",
-        "node": "گره",
-        "fx": "Fx",
-        "fy": "Fy",
-        "resultant": "برآیند",
+        "node_col": "گره",
+        "fx": "Fx (kN)",
+        "fy": "Fy (kN)",
+        "resultant": "برآیند (kN)",
         "angle": "زاویه",
-        "member": "عضو",
-        "length": "طول",
-        "force": "نیرو",
+        "member_col": "عضو",
+        "length_col": "طول (متر)",
+        "force_col": "نیرو (kN)",
         "type": "نوع",
         "tension": "کشش",
         "compression": "فشار",
-        "ux": "Ux",
-        "uy": "Uy",
-        "units_reaction": "kN",
-        "units_force": "kN",
-        "units_disp": "mm",
-        "units_length": "m",
-        "no_data": "گره‌ها و اعضا را تعریف کرده، سپس تحلیل را بزنید.",
-        "need_minimum": "حداقل ۲ گره و ۱ عضو الزامی است.",
-        "analysis_error": "تحلیل ناموفق. تکیه‌گاه‌ها و هندسه را بررسی کنید.",
-        "legend_tension": "کشش",
-        "legend_compression": "فشار",
-        "legend_load": "بار اعمالی",
-        "legend_reaction": "عکس‌العمل",
-        "export": "خروجی نتایج",
+        "ux": "Ux (mm)",
+        "uy": "Uy (mm)",
+        "no_data": "اطلاعاتی نیست",
+        "need_min": "حداقل ۲ گره و ۱ عضو اضافه کنید",
+        "error_analysis": "تحلیل ناموفق. تکیه‌گاه‌ها و هندسه را بررسی کنید.",
+        "legend": "آبی = کشش  |  قرمز = فشار  |  سبز = بار  |  نارنجی = عکس‌العمل",
+        "export": "خروجی",
+        "length": "طول",
     }
 }
 
 # ============================================================================
-# TRUSS SOLVER - Supports loads anywhere on member
+# ENGINE - Matrix Stiffness Method
 # ============================================================================
 
-class TrussAnalyzer:
-    def __init__(self, nodes_dict, members_list, supports_dict, joint_loads_dict, member_loads_list):
-        self.node_names = list(nodes_dict.keys())
-        self.node_coords = {n: nodes_dict[n] for n in self.node_names}
-        self.node_idx = {n: i for i, n in enumerate(self.node_names)}
-        self.n_nodes = len(self.node_names)
-        self.n_dofs = 2 * self.n_nodes
+class Engine:
+    def __init__(self, nodes, members, supports, joint_loads, member_loads):
+        self.node_names = list(nodes.keys())
+        self.node_coords = nodes
+        self.idx = {n: i for i, n in enumerate(self.node_names)}
+        self.n = len(self.node_names)
+        self.ndof = 2 * self.n
         
-        self.members = members_list  # [(name, n1, n2)]
-        self.supports = supports_dict  # {node: type}
-        self.joint_loads = joint_loads_dict  # {node: (mag, ang)}
-        self.member_loads = member_loads_list  # [(load_name, member, position, mag, ang)]
+        self.members = members
+        self.supports = supports
+        self.joint_loads = joint_loads
+        self.member_loads = member_loads
         
         self.E = 200e6
         self.A = 0.01
         
-        self.K = np.zeros((self.n_dofs, self.n_dofs))
-        self.F = np.zeros(self.n_dofs)
+        self.K = np.zeros((self.ndof, self.ndof))
+        self.F = np.zeros(self.ndof)
         self.U = None
-        self.member_forces = {}
+        self.forces = {}
         self.reactions = {}
         
-        self._assemble_stiffness()
-        self._apply_loads()
-        self._apply_supports()
+        self._stiffness()
+        self._loads()
+        self._boundary()
         self._solve()
     
     def _dof(self, name):
-        i = self.node_idx[name]
+        i = self.idx[name]
         return 2*i, 2*i+1
     
-    def _assemble_stiffness(self):
-        for mname, n1, n2 in self.members:
+    def _stiffness(self):
+        for n1, n2 in self.members:
             x1, y1 = self.node_coords[n1]
             x2, y2 = self.node_coords[n2]
             dx, dy = x2-x1, y2-y1
-            L = np.sqrt(dx**2 + dy**2)
-            if L < 1e-10: continue
+            L = np.hypot(dx, dy)
+            if L < 1e-9: continue
             c, s = dx/L, dy/L
-            
-            k = (self.E * self.A / L) * np.array([
+            k = (self.E*self.A/L) * np.array([
                 [c*c, c*s, -c*c, -c*s],
                 [c*s, s*s, -c*s, -s*s],
                 [-c*c, -c*s, c*c, c*s],
                 [-c*s, -s*s, c*s, s*s]
             ])
-            
-            d1x, d1y = self._dof(n1)
-            d2x, d2y = self._dof(n2)
-            for ii, gi in enumerate([d1x, d1y, d2x, d2y]):
-                for jj, gj in enumerate([d1x, d1y, d2x, d2y]):
-                    self.K[gi, gj] += k[ii, jj]
+            d = [*self._dof(n1), *self._dof(n2)]
+            for i in range(4):
+                for j in range(4):
+                    self.K[d[i], d[j]] += k[i, j]
     
-    def _apply_loads(self):
-        # Joint loads
+    def _loads(self):
         for node, (mag, ang) in self.joint_loads.items():
             r = np.radians(ang)
             dx, dy = self._dof(node)
             self.F[dx] += mag * np.cos(r)
             self.F[dy] += mag * np.sin(r)
         
-        # Member loads at any position
-        for lname, mname, pos, mag, ang in self.member_loads:
-            for mn, n1, n2 in self.members:
-                if mn == mname:
-                    x1, y1 = self.node_coords[n1]
-                    x2, y2 = self.node_coords[n2]
-                    L = np.sqrt((x2-x1)**2 + (y2-y1)**2)
-                    if L < 1e-10: break
-                    c, s = (x2-x1)/L, (y2-y1)/L
-                    r = np.radians(ang)
-                    
-                    # Force components in global
-                    fx = mag * np.cos(r)
-                    fy = mag * np.sin(r)
-                    
-                    # Axial component along member
-                    axial = fx * c + fy * s
-                    
-                    # Position ratios for equivalent nodal loads
-                    a = pos      # distance ratio from start
-                    b = 1 - pos  # distance ratio from end
-                    
-                    d1x, d1y = self._dof(n1)
-                    d2x, d2y = self._dof(n2)
-                    
-                    self.F[d1x] += axial * c * b
-                    self.F[d1y] += axial * s * b
-                    self.F[d2x] += axial * c * a
-                    self.F[d2y] += axial * s * a
+        for node, member, pos, mag, ang in self.member_loads:
+            found = None
+            for n1, n2 in self.members:
+                if (n1, n2) == member or f"{n1}{n2}" == member or n1+n2 == member:
+                    found = (n1, n2)
                     break
+            if not found: continue
+            n1, n2 = found
+            x1, y1 = self.node_coords[n1]
+            x2, y2 = self.node_coords[n2]
+            L = np.hypot(x2-x1, y2-y1)
+            if L < 1e-9: continue
+            r = np.radians(ang)
+            fx = mag * np.cos(r)
+            fy = mag * np.sin(r)
+            c = (x2-x1)/L
+            s = (y2-y1)/L
+            axial = fx*c + fy*s
+            alpha = pos
+            f1 = axial * (1 - alpha)
+            f2 = axial * alpha
+            d1x, d1y = self._dof(n1)
+            d2x, d2y = self._dof(n2)
+            self.F[d1x] += f1*c
+            self.F[d1y] += f1*s
+            self.F[d2x] += f2*c
+            self.F[d2y] += f2*s
     
-    def _apply_supports(self):
-        penalty = 1e15
-        for node, stype in self.supports.items():
+    def _boundary(self):
+        big = 1e15
+        for node, typ in self.supports.items():
             dx, dy = self._dof(node)
-            if stype == 'pinned':
-                self.K[dx, dx] += penalty
-                self.K[dy, dy] += penalty
-            elif stype == 'roller_x':
-                self.K[dy, dy] += penalty
-            elif stype == 'roller_y':
-                self.K[dx, dx] += penalty
+            if typ == 'pinned':
+                self.K[dx,dx] += big; self.K[dy,dy] += big
+            elif typ == 'roller_x':
+                self.K[dy,dy] += big
+            elif typ == 'roller_y':
+                self.K[dx,dx] += big
     
     def _solve(self):
         try:
             self.U = np.linalg.solve(self.K, self.F)
-            
-            for mname, n1, n2 in self.members:
-                x1, y1 = self.node_coords[n1]
-                x2, y2 = self.node_coords[n2]
-                dx, dy = x2-x1, y2-y1
-                L = np.sqrt(dx**2+dy**2)
-                if L < 1e-10: 
-                    self.member_forces[mname] = 0
-                    continue
-                c, s = dx/L, dy/L
-                d1x, d1y = self._dof(n1)
-                d2x, d2y = self._dof(n2)
-                u1, v1 = self.U[d1x], self.U[d1y]
-                u2, v2 = self.U[d2x], self.U[d2y]
-                force = (self.E * self.A / L) * (c*(u2-u1) + s*(v2-v1))
-                self.member_forces[mname] = force
-            
+            for n1, n2 in self.members:
+                x1, y1 = self.node_coords[n1]; x2, y2 = self.node_coords[n2]
+                L = np.hypot(x2-x1, y2-y1)
+                if L < 1e-9: self.forces[(n1,n2)] = 0; continue
+                c, s = (x2-x1)/L, (y2-y1)/L
+                d1x, d1y = self._dof(n1); d2x, d2y = self._dof(n2)
+                f = (self.E*self.A/L)*(c*(self.U[d2x]-self.U[d1x]) + s*(self.U[d2y]-self.U[d1y]))
+                self.forces[(n1,n2)] = f
             for node in self.supports:
                 dx, dy = self._dof(node)
-                rx = np.dot(self.K[dx, :], self.U) - self.F[dx]
-                ry = np.dot(self.K[dy, :], self.U) - self.F[dy]
+                rx = self.K[dx]@self.U - self.F[dx]
+                ry = self.K[dy]@self.U - self.F[dy]
                 self.reactions[node] = (rx, ry)
         except:
             self.U = None
 
 # ============================================================================
-# VISUALIZATION
+# DRAWING
 # ============================================================================
 
-def draw_truss(nodes_dict, members_list, supports_dict, joint_loads, member_loads,
-               member_forces=None, reactions=None, lang=None, show_results=False):
+def draw(nodes, members, supports, joint_loads, member_loads, 
+         results=None, lang=None, highlight_delete=None):
     if lang is None:
         lang = LANG["English"]
     
-    fig, ax = plt.subplots(figsize=(11, 9))
+    fig, ax = plt.subplots(figsize=(10, 8))
+    fig.patch.set_alpha(0)
+    
     ax.set_aspect('equal')
-    ax.grid(True, alpha=0.2, linestyle='-', color='#d0d5dd')
-    ax.set_xlabel('X (m)', fontsize=10, color='#6b7280')
-    ax.set_ylabel('Y (m)', fontsize=10, color='#6b7280')
-    ax.tick_params(labelsize=8, colors='#9ca3af')
-    for spine in ax.spines.values():
-        spine.set_color('#e5e7eb')
+    ax.grid(True, alpha=0.12, linestyle='--', color='#888')
+    ax.set_xlabel('X (m)', fontsize=10, color='#666')
+    ax.set_ylabel('Y (m)', fontsize=10, color='#666')
+    ax.tick_params(labelsize=8, colors='#888')
     
-    xs = [c[0] for c in nodes_dict.values()]
-    ys = [c[1] for c in nodes_dict.values()]
-    if not xs:
-        xs, ys = [0, 10], [0, 10]
+    xs = [c[0] for c in nodes.values()]
+    ys = [c[1] for c in nodes.values()]
+    if not xs: xs, ys = [0,10], [0,10]
+    mrg = max(max(xs)-min(xs), max(ys)-min(ys), 2)*0.3 + 1
+    ax.set_xlim(min(xs)-mrg, max(xs)+mrg)
+    ax.set_ylim(min(ys)-mrg, max(ys)+mrg)
     
-    margin = max(max(xs)-min(xs), max(ys)-min(ys), 2) * 0.25 + 1.5
-    ax.set_xlim(min(xs)-margin, max(xs)+margin)
-    ax.set_ylim(min(ys)-margin, max(ys)+margin)
+    forces_map = results.get('forces', {}) if results else {}
+    reacts_map = results.get('reactions', {}) if results else {}
     
     # Members
-    for mname, n1, n2 in members_list:
-        x1, y1 = nodes_dict[n1]
-        x2, y2 = nodes_dict[n2]
-        
-        if show_results and member_forces and mname in member_forces:
-            f = member_forces[mname]
-            color = '#2563eb' if f >= 0 else '#dc2626'
+    for n1, n2 in members:
+        x1, y1 = nodes[n1]; x2, y2 = nodes[n2]
+        key = (n1, n2)
+        if key in forces_map:
+            f = forces_map[key]
+            color = '#2e86de' if f >= 0 else '#e74c3c'
             lw = 3.5
+            ft = 'T' if f >= 0 else 'C'
+            label = f'{n1}{n2}  {abs(f):.1f}kN ({ft})'
         else:
-            color = '#9ca3af'
+            color = '#999'
             lw = 2
+            L = np.hypot(x2-x1, y2-y1)
+            label = f'{n1}{n2}  {L:.2f}m'
         
-        ax.plot([x1, x2], [y1, y2], color=color, linewidth=lw, zorder=2, solid_capstyle='round')
+        is_hl = highlight_delete and (n1, n2) == highlight_delete
+        if is_hl:
+            color = '#e74c3c'
+            lw = 4
+            ax.plot([x1, x2], [y1, y2], color=color, linewidth=lw, zorder=2, alpha=0.6)
+            ax.plot([x1, x2], [y1, y2], color='#ff6b6b', linewidth=lw+2, zorder=1, alpha=0.3)
+        else:
+            ax.plot([x1, x2], [y1, y2], color=color, linewidth=lw, zorder=2)
         
         mx, my = (x1+x2)/2, (y1+y2)/2
-        L = np.sqrt((x2-x1)**2 + (y2-y1)**2)
-        
-        if show_results and member_forces and mname in member_forces:
-            fv = abs(member_forces[mname])
-            ft = 'T' if member_forces[mname] >= 0 else 'C'
-            label = f'{mname}\n{fv:.1f} kN ({ft})'
-        else:
-            label = f'{mname}\n{L:.2f} m'
-        
         ax.annotate(label, (mx, my), fontsize=7, ha='center', va='center',
-                   color='#374151', fontweight='600',
-                   bbox=dict(boxstyle='round,pad=0.25', facecolor='white',
-                            edgecolor='#e5e7eb', alpha=0.92))
+                   fontweight='bold', color='#222' if not is_hl else '#e74c3c',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                            edgecolor='#ddd', alpha=0.92))
     
     # Nodes
-    for name, (x, y) in nodes_dict.items():
-        ax.plot(x, y, 'o', color='#2563eb', markersize=9, zorder=5, markeredgecolor='white', markeredgewidth=2)
-        ax.annotate(name, (x, y), fontsize=9, fontweight='700', color='#1a1a1a',
-                   xytext=(8, 8), textcoords='offset points')
+    for name, (x, y) in nodes.items():
+        ax.plot(x, y, 'o', color='white', markersize=12, zorder=5, markeredgecolor='#555', markeredgewidth=2)
+        ax.plot(x, y, 'o', color='#2a5298', markersize=8, zorder=6)
+        ax.annotate(name, (x, y), fontsize=10, fontweight='bold', color='#222',
+                   xytext=(9, 9), textcoords='offset points',
+                   bbox=dict(boxstyle='round,pad=0.2', facecolor='white', edgecolor='#ddd', alpha=0.9))
     
     # Supports
-    for node, stype in supports_dict.items():
-        x, y = nodes_dict[node]
-        if stype == 'pinned':
-            tri = Polygon([[x-0.5, y-0.5], [x+0.5, y-0.5], [x, y-0.02]],
-                         facecolor='#6b7280', edgecolor='#374151', zorder=3, linewidth=1.2)
+    for node, typ in supports.items():
+        x, y = nodes[node]
+        if typ == 'pinned':
+            tri = Polygon([[x-0.45, y-0.45], [x+0.45, y-0.45], [x, y]],
+                         facecolor='#888', edgecolor='#444', zorder=3, linewidth=1.5)
             ax.add_patch(tri)
-            for i in range(4):
-                ax.plot([x-0.45+i*0.3, x-0.4+i*0.3], [y-0.5, y-0.65],
-                       color='#374151', linewidth=1)
-        elif stype == 'roller_x':
-            circ = Circle((x, y-0.3), 0.2, facecolor='white', edgecolor='#374151', zorder=3, linewidth=1.2)
-            ax.add_patch(circ)
-            ax.plot([x-0.5, x+0.5], [y-0.6, y-0.6], color='#374151', linewidth=1.2)
-        elif stype == 'roller_y':
-            circ = Circle((x-0.3, y), 0.2, facecolor='white', edgecolor='#374151', zorder=3, linewidth=1.2)
-            ax.add_patch(circ)
-            ax.plot([x-0.6, x-0.6], [y-0.5, y+0.5], color='#374151', linewidth=1.2)
+            for i in range(3):
+                ax.plot([x-0.4+i*0.4, x-0.35+i*0.4], [y-0.45, y-0.6], color='#444', linewidth=1.2)
+        elif typ == 'roller_x':
+            c = Circle((x, y-0.28), 0.18, facecolor='white', edgecolor='#444', zorder=3, linewidth=1.5)
+            ax.add_patch(c)
+            ax.plot([x-0.45, x+0.45], [y-0.6, y-0.6], color='#444', linewidth=1.5)
+        elif typ == 'roller_y':
+            c = Circle((x-0.28, y), 0.18, facecolor='white', edgecolor='#444', zorder=3, linewidth=1.5)
+            ax.add_patch(c)
+            ax.plot([x-0.6, x-0.6], [y-0.45, y+0.45], color='#444', linewidth=1.5)
     
     # Scale
-    all_f = [mag for mag, _ in joint_loads.values()]
-    for _, _, _, mag, _ in member_loads:
-        all_f.append(mag)
-    max_f = max(all_f) if all_f else 1
-    scale = (max(xs)-min(xs)) / max_f * 0.18 if max_f > 0 else 0.5
+    all_f = [mag for mag,_ in joint_loads.values()]
+    for _,_,_,mag,_ in member_loads: all_f.append(mag)
+    mx_f = max(all_f) if all_f else 1
+    scale = (max(xs)-min(xs))/mx_f*0.15 if mx_f > 0 else 0.5
     
     # Joint loads
     for node, (mag, ang) in joint_loads.items():
-        x, y = nodes_dict[node]
+        x, y = nodes[node]
         r = np.radians(ang)
-        dx = -mag * np.cos(r) * scale
-        dy = -mag * np.sin(r) * scale
+        dx = -mag*np.cos(r)*scale
+        dy = -mag*np.sin(r)*scale
         ax.arrow(x+dx, y+dy, -dx*0.85, -dy*0.85,
-                head_width=0.2, head_length=0.3, fc='#059669', ec='#059669',
-                linewidth=2.2, zorder=7)
-        ax.annotate(f'{mag:.1f} kN', (x+dx*1.15, y+dy*1.15),
-                   fontsize=7, color='#059669', fontweight='600')
+                head_width=0.22, head_length=0.3, fc='#27ae60', ec='#27ae60',
+                linewidth=2.2, zorder=8)
+        ax.annotate(f'{mag:.1f}kN', (x+dx*1.15, y+dy*1.15),
+                   fontsize=7.5, color='#1e8449', fontweight='bold')
     
-    # Member loads at any position
-    for lname, mname, pos, mag, ang in member_loads:
-        for mn, n1, n2 in members_list:
-            if mn == mname:
-                x1, y1 = nodes_dict[n1]
-                x2, y2 = nodes_dict[n2]
-                px = x1 + pos*(x2-x1)
-                py = y1 + pos*(y2-y1)
-                r = np.radians(ang)
-                dx = -mag * np.cos(r) * scale
-                dy = -mag * np.sin(r) * scale
-                ax.arrow(px+dx, py+dy, -dx*0.85, -dy*0.85,
-                        head_width=0.2, head_length=0.3, fc='#d97706', ec='#d97706',
-                        linewidth=2.2, zorder=7)
-                ax.annotate(f'{lname}\n{mag:.1f} kN', (px+dx*1.15, py+dy*1.15),
-                           fontsize=6.5, color='#d97706', fontweight='600')
-                break
+    # Member loads
+    for _, member, pos, mag, ang in member_loads:
+        found = None
+        for n1, n2 in members:
+            if (n1,n2)==member or f"{n1}{n2}"==member or n1+n2==member:
+                found=(n1,n2); break
+        if not found: continue
+        n1,n2=found
+        x1,y1=nodes[n1]; x2,y2=nodes[n2]
+        lx = x1 + (x2-x1)*pos
+        ly = y1 + (y2-y1)*pos
+        r = np.radians(ang)
+        dx = -mag*np.cos(r)*scale
+        dy = -mag*np.sin(r)*scale
+        ax.arrow(lx+dx, ly+dy, -dx*0.85, -dy*0.85,
+                head_width=0.22, head_length=0.3, fc='#f39c12', ec='#f39c12',
+                linewidth=2.2, zorder=8)
+        ax.annotate(f'{mag:.1f}kN', (lx+dx*1.15, ly+dy*1.15),
+                   fontsize=7.5, color='#d68910', fontweight='bold')
     
     # Reactions
-    if show_results and reactions:
-        for node, (rx, ry) in reactions.items():
-            x, y = nodes_dict[node]
-            if abs(rx) > 0.01 or abs(ry) > 0.01:
+    if reacts_map:
+        for node, (rx, ry) in reacts_map.items():
+            x, y = nodes[node]
+            if abs(rx)>0.01 or abs(ry)>0.01:
                 dx, dy = rx*scale*0.7, ry*scale*0.7
                 ax.arrow(x-dx, y-dy, dx*0.85, dy*0.85,
-                        head_width=0.2, head_length=0.3, fc='#7c3aed', ec='#7c3aed',
-                        linewidth=2.8, zorder=7)
-                R = np.sqrt(rx**2+ry**2)
-                ax.annotate(f'{R:.1f} kN', (x-dx*1.15, y-dy*1.15),
-                           fontsize=7, color='#7c3aed', fontweight='600')
+                        head_width=0.22, head_length=0.3, fc='#e67e22', ec='#e67e22',
+                        linewidth=2.5, zorder=8)
+                R = np.hypot(rx, ry)
+                ax.annotate(f'R={R:.1f}kN', (x-dx*1.15, y-dy*1.15),
+                           fontsize=7.5, color='#ca6f1e', fontweight='bold')
     
-    # Legend
-    if show_results:
-        legend = f'{lang["legend_tension"]} | {lang["legend_compression"]} | {lang["legend_load"]} | {lang["legend_reaction"]}'
-        ax.text(0.5, 1.02, legend, transform=ax.transAxes, fontsize=7,
-               color='#6b7280', ha='center',
-               bbox=dict(boxstyle='round', facecolor='white', edgecolor='#e5e7eb', alpha=0.9))
+    ax.text(0.5, 1.02, lang['legend'], transform=ax.transAxes,
+           fontsize=7, color='#999', ha='center',
+           bbox=dict(boxstyle='round', facecolor='white', edgecolor='#ddd', alpha=0.85))
     
     plt.tight_layout()
     return fig
@@ -619,436 +575,376 @@ def draw_truss(nodes_dict, members_list, supports_dict, joint_loads, member_load
 # ============================================================================
 
 def main():
-    # Init session state
-    defaults = {
-        'language': 'English',
+    # Init state
+    for k, v in {
+        'lang': 'English',
         'nodes': {},
         'members': [],
         'supports': {},
         'joint_loads': {},
         'member_loads': [],
         'results': None,
-        'selected_node': None,
-        'selected_member': None,
-        'selected_support_node': None,
-        'form_node_name': '',
-        'form_node_x': '',
-        'form_node_y': '',
-        'form_member_start': '',
-        'form_member_end': '',
-        'form_support_node': '',
-        'form_support_type': '',
-        'form_load_type': '',
-        'form_load_name': '',
-        'form_load_location': '',
-        'form_load_position': '',
-        'form_load_mag': '',
-        'form_load_ang': '',
-    }
-    for k, v in defaults.items():
+        'sel_node': None,
+        'sel_member': None,
+        'sel_support': None,
+        'sel_load': None,
+        'highlight_del': None,
+    }.items():
         if k not in st.session_state:
             st.session_state[k] = v
     
-    lang = LANG[st.session_state.language]
+    t = LANG[st.session_state.lang]
     
-    # Header - clean
-    col_lang, col_title = st.columns([1, 6])
-    with col_lang:
-        st.session_state.language = st.selectbox(
-            "", ["English", "Persian"], label_visibility="collapsed", key="lang_sel"
-        )
+    # Header
+    cL, cT = st.columns([0.7, 5])
+    with cL:
+        st.session_state.lang = st.selectbox("", ["English","Persian"], 
+                                             label_visibility="collapsed", key="langsel")
     
-    st.markdown(f'<div class="app-title">{lang["title"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="app-title">{t["title"]}</div>', unsafe_allow_html=True)
     
-    # Main layout
-    left, right = st.columns([1, 1.1])
+    # Layout: Left=inputs, Right=drawing
+    left, right = st.columns([1, 1.05])
     
-    # ===== RIGHT: Live Preview =====
     with right:
-        st.markdown(f'<div class="section-label">{lang["live_preview"]}</div>', unsafe_allow_html=True)
-        
-        show_results = st.session_state.results is not None
-        fig = draw_truss(
+        # Drawing always visible
+        res = st.session_state.results
+        fig = draw(
             st.session_state.nodes,
             st.session_state.members,
             st.session_state.supports,
             st.session_state.joint_loads,
             st.session_state.member_loads,
-            member_forces=st.session_state.results.get('member_forces') if show_results else None,
-            reactions=st.session_state.results.get('reactions') if show_results else None,
-            lang=lang,
-            show_results=show_results
+            results=res,
+            lang=t,
+            highlight_delete=st.session_state.highlight_del
         )
         st.pyplot(fig)
+        
+        # Results below drawing
+        if res:
+            st.markdown("---")
+            st.markdown(f"### {t['reactions']}")
+            if res.get('reactions'):
+                rd = []
+                for n, (fx, fy) in res['reactions'].items():
+                    R = np.hypot(fx, fy)
+                    ang = np.degrees(np.arctan2(fy, fx))
+                    rd.append({t['node_col']: n, t['fx']: f"{fx:.3f}", 
+                              t['fy']: f"{fy:.3f}", t['resultant']: f"{R:.3f}",
+                              t['angle']: f"{ang:.1f}"})
+                st.dataframe(pd.DataFrame(rd), hide_index=True, use_container_width=True)
+            
+            col_f, col_d = st.columns(2)
+            with col_f:
+                st.markdown(f"### {t['member_forces']}")
+                if res.get('forces'):
+                    fd = []
+                    for (n1,n2), f in res['forces'].items():
+                        L = np.hypot(
+                            st.session_state.nodes[n2][0]-st.session_state.nodes[n1][0],
+                            st.session_state.nodes[n2][1]-st.session_state.nodes[n1][1]
+                        )
+                        fd.append({
+                            t['member_col']: f"{n1}{n2}",
+                            t['length_col']: f"{L:.2f}",
+                            t['force_col']: f"{abs(f):.3f}",
+                            t['type']: t['tension'] if f>=0 else t['compression']
+                        })
+                    st.dataframe(pd.DataFrame(fd), hide_index=True, use_container_width=True)
+            with col_d:
+                st.markdown(f"### {t['displacements']}")
+                if res.get('displacements') is not None:
+                    dd = []
+                    for i, n in enumerate(res['node_names']):
+                        ux = res['displacements'][2*i]*1000
+                        uy = res['displacements'][2*i+1]*1000
+                        dd.append({t['node_col']: n, t['ux']: f"{ux:.4f}", t['uy']: f"{uy:.4f}"})
+                    st.dataframe(pd.DataFrame(dd), hide_index=True, use_container_width=True)
+            
+            if st.button(t['export']):
+                buf = io.StringIO()
+                buf.write("2D TRUSS ANALYSIS\n"+"="*40+"\n\n")
+                buf.write("REACTIONS:\n")
+                for n,(fx,fy) in res['reactions'].items():
+                    buf.write(f"  {n}: Fx={fx:.3f}, Fy={fy:.3f}, R={np.hypot(fx,fy):.3f}\n")
+                buf.write("\nMEMBER FORCES:\n")
+                for (n1,n2),f in res['forces'].items():
+                    buf.write(f"  {n1}{n2}: {abs(f):.3f} kN ({'T' if f>=0 else 'C'})\n")
+                st.download_button("Download", buf.getvalue(), "results.txt", "text/plain")
     
-    # ===== LEFT: Input =====
     with left:
-        tabs = st.tabs([lang["nodes"], lang["members"], lang["supports"], lang["loads"]])
+        tabs = st.tabs([t['nodes_tab'], t['members_tab'], t['supports_tab'], t['loads_tab']])
         
-        # ---- NODES ----
+        # ===== NODES =====
         with tabs[0]:
-            # Table
             if st.session_state.nodes:
-                data = [{"Name": n, "X": x, "Y": y} for n, (x, y) in st.session_state.nodes.items()]
-                df = pd.DataFrame(data)
-                st.caption(lang["tap_to_edit"])
+                nd = [{"Name": n, "X": x, "Y": y} for n,(x,y) in st.session_state.nodes.items()]
+                df = pd.DataFrame(nd)
+                st.caption(t['click_to_edit'])
                 sel = st.dataframe(df, hide_index=True, use_container_width=True,
-                                  selection_mode="single-row", on_select="rerun", key="tbl_nodes")
-                if sel and len(sel.selection.rows) > 0:
-                    idx = sel.selection.rows[0]
-                    name = list(st.session_state.nodes.keys())[idx]
-                    st.session_state.selected_node = name
-                    st.session_state.form_node_name = name
-                    st.session_state.form_node_x = str(st.session_state.nodes[name][0])
-                    st.session_state.form_node_y = str(st.session_state.nodes[name][1])
+                                  selection_mode="single-row", on_select="rerun", key="ntable")
+                if sel and sel.selection.rows:
+                    st.session_state.sel_node = list(st.session_state.nodes.keys())[sel.selection.rows[0]]
             
-            # Delete button - right below table
-            if st.session_state.selected_node and st.session_state.selected_node in st.session_state.nodes:
-                if st.button(lang["delete_selected"], key="del_node", 
-                           type="secondary"):
-                    name = st.session_state.selected_node
-                    del st.session_state.nodes[name]
-                    st.session_state.members = [m for m in st.session_state.members if m[1] != name and m[2] != name]
-                    st.session_state.supports.pop(name, None)
-                    st.session_state.joint_loads.pop(name, None)
-                    st.session_state.selected_node = None
-                    st.session_state.form_node_name = ''
-                    st.session_state.form_node_x = ''
-                    st.session_state.form_node_y = ''
+            with st.form("nf", clear_on_submit=False):
+                sel_n = st.session_state.sel_node
+                dn, dx, dy = "", "", ""
+                if sel_n and sel_n in st.session_state.nodes:
+                    dn = sel_n
+                    dx = str(st.session_state.nodes[sel_n][0])
+                    dy = str(st.session_state.nodes[sel_n][1])
+                
+                c1,c2,c3 = st.columns(3)
+                with c1: name = st.text_input(t['node_name'], value=dn, placeholder="A", key="ninp")
+                with c2: xv = st.text_input(t['x_coord'], value=dx, placeholder="0", key="xinp")
+                with c3: yv = st.text_input(t['y_coord'], value=dy, placeholder="0", key="yinp")
+                
+                b1,b2,b3 = st.columns(3)
+                with b1: add = st.form_submit_button(t['add_node'])
+                with b2: upd = st.form_submit_button(t['update_node'])
+                with b3: delete = st.form_submit_button(t['delete_node'])
+            
+            if add and name:
+                try:
+                    st.session_state.nodes[name] = (float(xv or 0), float(yv or 0))
+                    st.session_state.sel_node = None
                     st.rerun()
+                except ValueError:
+                    st.error("X and Y must be numbers")
             
-            # Form - keeps values
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                node_name = st.text_input(lang["node_name"], 
-                                         value=st.session_state.form_node_name,
-                                         placeholder="A", key="inp_nname",
-                                         label_visibility="collapsed")
-            with c2:
-                node_x = st.text_input(lang["x_coord"],
-                                      value=st.session_state.form_node_x,
-                                      placeholder="0", key="inp_nx",
-                                      label_visibility="collapsed")
-            with c3:
-                node_y = st.text_input(lang["y_coord"],
-                                      value=st.session_state.form_node_y,
-                                      placeholder="0", key="inp_ny",
-                                      label_visibility="collapsed")
+            if upd and sel_n and name:
+                try:
+                    old = sel_n
+                    coords = (float(xv or 0), float(yv or 0))
+                    del st.session_state.nodes[old]
+                    st.session_state.nodes[name] = coords
+                    st.session_state.members = [
+                        (name if m[0]==old else m[0], name if m[1]==old else m[1])
+                        for m in st.session_state.members
+                    ]
+                    st.session_state.supports = {
+                        (name if k==old else k): v for k,v in st.session_state.supports.items()
+                    }
+                    st.session_state.joint_loads = {
+                        (name if k==old else k): v for k,v in st.session_state.joint_loads.items()
+                    }
+                    st.session_state.sel_node = name
+                    st.rerun()
+                except ValueError:
+                    st.error("X and Y must be numbers")
             
-            # Save form values so they persist
-            st.session_state.form_node_name = node_name
-            st.session_state.form_node_x = node_x
-            st.session_state.form_node_y = node_y
-            
-            if st.button(lang["add_node"], key="btn_add_node", use_container_width=True):
-                if node_name:
-                    try:
-                        xf = float(node_x) if node_x else 0.0
-                        yf = float(node_y) if node_y else 0.0
-                        st.session_state.nodes[node_name] = (xf, yf)
-                        st.session_state.selected_node = node_name
-                        st.session_state.form_node_name = ''
-                        st.session_state.form_node_x = ''
-                        st.session_state.form_node_y = ''
-                        st.rerun()
-                    except ValueError:
-                        st.error("Coordinates must be numbers. Please fix and try again.")
+            if delete and sel_n:
+                del st.session_state.nodes[sel_n]
+                st.session_state.members = [m for m in st.session_state.members 
+                                           if m[0]!=sel_n and m[1]!=sel_n]
+                st.session_state.supports.pop(sel_n, None)
+                st.session_state.joint_loads.pop(sel_n, None)
+                st.session_state.sel_node = None
+                st.session_state.highlight_del = None
+                st.rerun()
         
-        # ---- MEMBERS ----
+        # ===== MEMBERS =====
         with tabs[1]:
             if st.session_state.members:
-                data = []
-                for mname, n1, n2 in st.session_state.members:
-                    x1, y1 = st.session_state.nodes.get(n1, (0,0))
-                    x2, y2 = st.session_state.nodes.get(n2, (0,0))
-                    L = np.sqrt((x2-x1)**2 + (y2-y1)**2)
-                    data.append({"Member": mname, "Start": n1, "End": n2, "Length": f"{L:.2f} m"})
-                df = pd.DataFrame(data)
-                st.caption(lang["tap_to_edit"])
+                md = []
+                for n1,n2 in st.session_state.members:
+                    x1,y1 = st.session_state.nodes[n1]
+                    x2,y2 = st.session_state.nodes[n2]
+                    L = np.hypot(x2-x1, y2-y1)
+                    md.append({"Name": f"{n1}{n2}", "Start": n1, "End": n2, t['length']: f"{L:.2f}"})
+                df = pd.DataFrame(md)
+                st.caption(t['click_to_edit'])
                 sel = st.dataframe(df, hide_index=True, use_container_width=True,
-                                  selection_mode="single-row", on_select="rerun", key="tbl_members")
-                if sel and len(sel.selection.rows) > 0:
-                    idx = sel.selection.rows[0]
-                    mname = st.session_state.members[idx][0]
-                    st.session_state.selected_member = mname
-                    st.session_state.form_member_start = st.session_state.members[idx][1]
-                    st.session_state.form_member_end = st.session_state.members[idx][2]
+                                  selection_mode="single-row", on_select="rerun", key="mtable")
+                if sel and sel.selection.rows:
+                    st.session_state.sel_member = st.session_state.members[sel.selection.rows[0]]
             
-            if st.session_state.selected_member:
-                if st.button(lang["delete_selected"], key="del_member", type="secondary"):
-                    st.session_state.members = [m for m in st.session_state.members if m[0] != st.session_state.selected_member]
-                    st.session_state.member_loads = [l for l in st.session_state.member_loads if l[1] != st.session_state.selected_member]
-                    st.session_state.selected_member = None
+            with st.form("mf", clear_on_submit=False):
+                sel_m = st.session_state.sel_member
+                ds, de = "", ""
+                nnames = list(st.session_state.nodes.keys())
+                if sel_m:
+                    ds, de = sel_m[0], sel_m[1]
+                
+                c1,c2 = st.columns(2)
+                with c1:
+                    si = nnames.index(ds) if ds in nnames else 0
+                    sn = st.selectbox(t['start_node'], nnames if nnames else ["-"], 
+                                     index=min(si, len(nnames)-1) if nnames else 0, key="sinp")
+                with c2:
+                    ei = nnames.index(de) if de in nnames else (1 if len(nnames)>1 else 0)
+                    en = st.selectbox(t['end_node'], nnames if nnames else ["-"],
+                                     index=min(ei, len(nnames)-1) if nnames else 0, key="einp")
+                
+                b1,b2,b3 = st.columns(3)
+                with b1: add_m = st.form_submit_button(t['add_member'])
+                with b2: upd_m = st.form_submit_button(t['update_member'])
+                with b3: delete_m = st.form_submit_button(t['delete_member'])
+            
+            if add_m and sn != en and sn in nnames and en in nnames:
+                if (sn,en) not in st.session_state.members and (en,sn) not in st.session_state.members:
+                    st.session_state.members.append((sn, en))
+                    st.session_state.sel_member = None
                     st.rerun()
             
-            node_names = list(st.session_state.nodes.keys())
-            c1, c2 = st.columns(2)
-            with c1:
-                s_idx = node_names.index(st.session_state.form_member_start) if st.session_state.form_member_start in node_names else 0
-                start_n = st.selectbox(lang["start_node"], node_names if node_names else ["-"],
-                                      index=s_idx, key="sel_mstart")
-            with c2:
-                e_idx = node_names.index(st.session_state.form_member_end) if st.session_state.form_member_end in node_names else (1 if len(node_names)>1 else 0)
-                end_n = st.selectbox(lang["end_node"], node_names if node_names else ["-"],
-                                    index=e_idx, key="sel_mend")
+            if upd_m and sel_m and sn != en:
+                st.session_state.members = [
+                    (sn, en) if m == sel_m else m for m in st.session_state.members
+                ]
+                st.session_state.sel_member = (sn, en)
+                st.rerun()
             
-            st.session_state.form_member_start = start_n
-            st.session_state.form_member_end = end_n
-            
-            if st.button(lang["add_member"], key="btn_add_member", use_container_width=True):
-                if start_n and end_n and start_n != end_n and start_n != "-" and end_n != "-":
-                    mname = f"{start_n}{end_n}"
-                    # Check if already exists
-                    if not any(m[0] == mname for m in st.session_state.members):
-                        st.session_state.members.append((mname, start_n, end_n))
-                        st.session_state.selected_member = mname
-                        st.rerun()
-                    else:
-                        st.error("This member already exists.")
+            if delete_m and sel_m:
+                st.session_state.members.remove(sel_m)
+                st.session_state.member_loads = [
+                    l for l in st.session_state.member_loads 
+                    if not ((l[1]==(sel_m[0],sel_m[1])) or (l[1]==f"{sel_m[0]}{sel_m[1]}") or (l[1]==sel_m[0]+sel_m[1]))
+                ]
+                st.session_state.sel_member = None
+                st.session_state.highlight_del = None
+                st.rerun()
         
-        # ---- SUPPORTS ----
+        # ===== SUPPORTS =====
         with tabs[2]:
             if st.session_state.supports:
-                data = [{"Node": n, "Type": t} for n, t in st.session_state.supports.items()]
-                df = pd.DataFrame(data)
-                st.caption(lang["tap_to_edit"])
+                sd = [{"Node": n, "Type": ty} for n,ty in st.session_state.supports.items()]
+                df = pd.DataFrame(sd)
+                st.caption(t['click_to_edit'])
                 sel = st.dataframe(df, hide_index=True, use_container_width=True,
-                                  selection_mode="single-row", on_select="rerun", key="tbl_supports")
-                if sel and len(sel.selection.rows) > 0:
-                    idx = sel.selection.rows[0]
-                    sname = list(st.session_state.supports.keys())[idx]
-                    st.session_state.selected_support_node = sname
-                    st.session_state.form_support_node = sname
-                    st.session_state.form_support_type = st.session_state.supports[sname]
+                                  selection_mode="single-row", on_select="rerun", key="stable")
+                if sel and sel.selection.rows:
+                    st.session_state.sel_support = list(st.session_state.supports.keys())[sel.selection.rows[0]]
             
-            if st.session_state.selected_support_node:
-                if st.button(lang["remove_support"], key="del_support", type="secondary"):
-                    del st.session_state.supports[st.session_state.selected_support_node]
-                    st.session_state.selected_support_node = None
-                    st.rerun()
+            with st.form("sf", clear_on_submit=False):
+                sel_sp = st.session_state.sel_support
+                nnames = list(st.session_state.nodes.keys())
+                ds = sel_sp if sel_sp and sel_sp in nnames else (nnames[0] if nnames else "")
+                dt = st.session_state.supports.get(sel_sp, t['support_types'][0]) if sel_sp else t['support_types'][0]
+                
+                c1,c2 = st.columns(2)
+                with c1:
+                    si = nnames.index(ds) if ds in nnames else 0
+                    spn = st.selectbox(t['support_node'], nnames if nnames else ["-"],
+                                      index=min(si, len(nnames)-1) if nnames else 0, key="spinp")
+                with c2:
+                    ti = t['support_types'].index(dt) if dt in t['support_types'] else 0
+                    spt = st.selectbox(t['support_type'], t['support_types'], index=ti, key="stinp")
+                
+                b1,b2 = st.columns(2)
+                with b1: add_s = st.form_submit_button(t['add_support'])
+                with b2: delete_s = st.form_submit_button(t['delete_support'])
             
-            node_names = list(st.session_state.nodes.keys())
-            c1, c2 = st.columns(2)
-            with c1:
-                s_idx = node_names.index(st.session_state.form_support_node) if st.session_state.form_support_node in node_names else 0
-                sup_node = st.selectbox(lang["support_node"], node_names if node_names else ["-"],
-                                       index=s_idx, key="sel_snode")
-            with c2:
-                type_map_rev = {'pinned': lang["support_types"][0], 'roller_x': lang["support_types"][1], 'roller_y': lang["support_types"][2]}
-                current_type = st.session_state.form_support_type
-                t_idx = lang["support_types"].index(type_map_rev.get(current_type, lang["support_types"][0])) if current_type else 0
-                sup_type = st.selectbox(lang["support_type"], lang["support_types"],
-                                       index=t_idx, key="sel_stype")
+            if add_s and spn in nnames:
+                st.session_state.supports[spn] = spt.lower().replace(' ','_')
+                st.session_state.sel_support = None
+                st.rerun()
             
-            st.session_state.form_support_node = sup_node
-            st.session_state.form_support_type = sup_type
-            
-            if st.button(lang["add_support"], key="btn_add_support", use_container_width=True):
-                if sup_node and sup_node != "-":
-                    type_map = {
-                        lang["support_types"][0]: 'pinned',
-                        lang["support_types"][1]: 'roller_x',
-                        lang["support_types"][2]: 'roller_y'
-                    }
-                    st.session_state.supports[sup_node] = type_map[sup_type]
-                    st.rerun()
+            if delete_s and sel_sp:
+                st.session_state.supports.pop(sel_sp, None)
+                st.session_state.sel_support = None
+                st.rerun()
         
-        # ---- LOADS ----
+        # ===== LOADS =====
         with tabs[3]:
             all_loads = []
             for node, (mag, ang) in st.session_state.joint_loads.items():
-                all_loads.append({"Type": "Node", "Location": node, "kN": mag, "deg": ang})
-            for lname, mname, pos, mag, ang in st.session_state.member_loads:
-                all_loads.append({"Type": "Member", "Location": f"{mname} @ {pos:.2f}", "kN": mag, "deg": ang, "Name": lname})
+                all_loads.append({"Type": "Node", "Location": node, "kN": mag, "Angle": ang})
+            for _, member, pos, mag, ang in st.session_state.member_loads:
+                mname = f"{member[0]}{member[1]}" if isinstance(member, tuple) else member
+                all_loads.append({"Type": "Member", "Location": f"{mname} @{pos:.2f}", 
+                                 "kN": mag, "Angle": ang})
             
             if all_loads:
-                df = pd.DataFrame(all_loads)
-                st.caption(lang["tap_to_edit"])
-                st.dataframe(df, hide_index=True, use_container_width=True)
+                st.dataframe(pd.DataFrame(all_loads), hide_index=True, use_container_width=True)
             
-            load_type = st.selectbox(lang["load_type"], lang["load_types"], key="sel_ltype")
-            st.session_state.form_load_type = load_type
-            
-            if load_type == lang["load_types"][0]:  # On node
-                c1, c2, c3, c4 = st.columns(4)
-                with c1:
-                    load_name = st.text_input(lang["load_type"].replace("Type","Name"), 
-                                             value=st.session_state.form_load_name,
-                                             placeholder="F1", key="inp_lname_n")
-                with c2:
-                    node_names = list(st.session_state.nodes.keys())
-                    l_idx = node_names.index(st.session_state.form_load_location) if st.session_state.form_load_location in node_names else 0
-                    load_at = st.selectbox(lang["load_node"], node_names if node_names else ["-"],
-                                          index=l_idx, key="sel_lnode")
-                with c3:
-                    load_mag = st.text_input(lang["load_magnitude"],
-                                            value=st.session_state.form_load_mag,
-                                            placeholder="10", key="inp_lmag_n")
-                with c4:
-                    load_ang = st.text_input(lang["load_angle"],
-                                            value=st.session_state.form_load_ang,
-                                            placeholder="270", key="inp_lang_n")
+            with st.form("lf", clear_on_submit=False):
+                ltype = st.selectbox(t['load_type'], t['load_types'], key="ltinp")
                 
-                st.session_state.form_load_name = load_name
-                st.session_state.form_load_location = load_at
-                st.session_state.form_load_mag = load_mag
-                st.session_state.form_load_ang = load_ang
-                
-                if st.button(lang["add_load"], key="btn_add_load_node", use_container_width=True):
-                    if load_at and load_at != "-":
-                        try:
-                            mag_f = float(load_mag) if load_mag else 0
-                            ang_f = float(load_ang) if load_ang else 0
-                            st.session_state.joint_loads[load_at] = (mag_f, ang_f)
-                            st.session_state.form_load_mag = ''
-                            st.session_state.form_load_ang = ''
-                            st.rerun()
-                        except ValueError:
-                            st.error("Magnitude and angle must be numbers.")
-            
-            else:  # On member
-                c1, c2, c3, c4, c5 = st.columns(5)
+                c1,c2,c3,c4,c5 = st.columns(5)
                 with c1:
-                    load_name = st.text_input("Name", value=st.session_state.form_load_name,
-                                             placeholder="W1", key="inp_lname_m")
+                    lname = st.text_input(t['load_name'], placeholder="F1", key="lninp")
                 with c2:
-                    mem_names = [m[0] for m in st.session_state.members]
-                    l_idx = mem_names.index(st.session_state.form_load_location) if st.session_state.form_load_location in mem_names else 0
-                    load_mem = st.selectbox(lang["load_member"], mem_names if mem_names else ["-"],
-                                           index=l_idx, key="sel_lmem")
+                    if ltype == t['load_types'][0]:
+                        nnames = list(st.session_state.nodes.keys())
+                        loc = st.selectbox(t['load_location'], nnames if nnames else ["-"], key="llinp")
+                    else:
+                        mnames = [f"{m[0]}{m[1]}" for m in st.session_state.members]
+                        loc = st.selectbox(t['load_member'], mnames if mnames else ["-"], key="llinp")
                 with c3:
-                    load_pos = st.text_input(lang["load_position"],
-                                            value=st.session_state.form_load_position,
-                                            placeholder="0.5", key="inp_lpos")
-                    st.caption(lang["load_position_hint"])
+                    if ltype == t['load_types'][1]:
+                        pos = st.slider(t['load_position'], 0.0, 1.0, 0.5, 0.01, key="lpinp")
+                    else:
+                        pos = 0.0
+                        st.text("")
                 with c4:
-                    load_mag = st.text_input(lang["load_magnitude"],
-                                            value=st.session_state.form_load_mag,
-                                            placeholder="10", key="inp_lmag_m")
+                    mag = st.text_input(t['load_magnitude'], placeholder="10", key="lminp")
                 with c5:
-                    load_ang = st.text_input(lang["load_angle"],
-                                            value=st.session_state.form_load_ang,
-                                            placeholder="270", key="inp_lang_m")
+                    ang = st.text_input(t['load_angle'], placeholder="270", key="lainp")
                 
-                st.session_state.form_load_name = load_name
-                st.session_state.form_load_location = load_mem
-                st.session_state.form_load_position = load_pos
-                st.session_state.form_load_mag = load_mag
-                st.session_state.form_load_ang = load_ang
-                
-                if st.button(lang["add_load"], key="btn_add_load_mem", use_container_width=True):
-                    if load_mem and load_mem != "-":
-                        try:
-                            pos_f = float(load_pos) if load_pos else 0.5
-                            mag_f = float(load_mag) if load_mag else 0
-                            ang_f = float(load_ang) if load_ang else 0
-                            pos_f = max(0, min(1, pos_f))
-                            st.session_state.member_loads.append((load_name, load_mem, pos_f, mag_f, ang_f))
-                            st.session_state.form_load_name = ''
-                            st.session_state.form_load_position = ''
-                            st.session_state.form_load_mag = ''
-                            st.session_state.form_load_ang = ''
-                            st.rerun()
-                        except ValueError:
-                            st.error("Position, magnitude, and angle must be numbers.")
+                b1,b2 = st.columns(2)
+                with b1: add_l = st.form_submit_button(t['add_load'])
+                with b2: delete_l = st.form_submit_button(t['delete_load'])
             
-            # Remove all loads button
-            if all_loads:
-                if st.button(lang["remove_load"], key="btn_clear_loads", type="secondary"):
-                    st.session_state.joint_loads = {}
-                    st.session_state.member_loads = []
-                    st.rerun()
+            if add_l:
+                try:
+                    mf = float(mag) if mag else 0
+                    af = float(ang) if ang else 0
+                    if ltype == t['load_types'][0] and loc in st.session_state.nodes:
+                        st.session_state.joint_loads[loc] = (mf, af)
+                        st.rerun()
+                    elif ltype == t['load_types'][1]:
+                        found = None
+                        for m in st.session_state.members:
+                            if f"{m[0]}{m[1]}" == loc or m[0]+m[1] == loc:
+                                found = m; break
+                        if found:
+                            st.session_state.member_loads.append((lname, found, pos, mf, af))
+                            st.rerun()
+                except ValueError:
+                    st.error("Force and angle must be numbers")
+            
+            if delete_l:
+                st.session_state.joint_loads = {}
+                st.session_state.member_loads = []
+                st.rerun()
     
-    # ===== ACTION BUTTONS =====
+    # Analyze / Reset
     st.markdown("---")
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        if st.button(lang["analyze"], type="primary", use_container_width=True, key="btn_analyze"):
+    ca, cr = st.columns([3, 1])
+    with ca:
+        if st.button(t['analyze'], use_container_width=True, type="primary"):
             if len(st.session_state.nodes) >= 2 and len(st.session_state.members) >= 1:
-                with st.spinner(""):
+                with st.spinner("Analyzing..."):
                     try:
-                        analyzer = TrussAnalyzer(
+                        eng = Engine(
                             st.session_state.nodes,
                             st.session_state.members,
                             st.session_state.supports,
                             st.session_state.joint_loads,
                             st.session_state.member_loads
                         )
-                        if analyzer.U is not None:
+                        if eng.U is not None:
                             st.session_state.results = {
-                                'reactions': analyzer.reactions,
-                                'member_forces': analyzer.member_forces,
-                                'displacements': analyzer.U,
-                                'node_names': analyzer.node_names
+                                'reactions': eng.reactions,
+                                'forces': eng.forces,
+                                'displacements': eng.U,
+                                'node_names': eng.node_names
                             }
                             st.rerun()
                         else:
-                            st.error(lang["analysis_error"])
+                            st.error(t['error_analysis'])
                     except Exception as e:
-                        st.error(f"{lang['analysis_error']}: {e}")
+                        st.error(f"{t['error_analysis']}: {e}")
             else:
-                st.warning(lang["need_minimum"])
+                st.warning(t['need_min'])
     
-    with c2:
-        if st.button(lang["reset"], use_container_width=True, key="btn_reset"):
-            for k in ['nodes', 'members', 'supports', 'joint_loads', 'member_loads', 'results',
-                     'selected_node', 'selected_member', 'selected_support_node',
-                     'form_node_name', 'form_node_x', 'form_node_y',
-                     'form_member_start', 'form_member_end',
-                     'form_support_node', 'form_support_type',
-                     'form_load_name', 'form_load_location', 'form_load_position', 'form_load_mag', 'form_load_ang']:
-                st.session_state[k] = {} if k in ['nodes', 'supports', 'joint_loads', 'results'] else ('' if 'form_' in k else [])
+    with cr:
+        if st.button(t['reset'], use_container_width=True):
+            for k in ['nodes','members','supports','joint_loads','member_loads',
+                     'results','sel_node','sel_member','sel_support','sel_load','highlight_del']:
+                st.session_state[k] = {} if k in ['nodes','supports','joint_loads'] else [] if k in ['members','member_loads'] else None
             st.rerun()
-    
-    # ===== RESULTS (below drawing) =====
-    if st.session_state.results:
-        st.markdown("---")
-        res = st.session_state.results
-        
-        r1, r2, r3 = st.columns(3)
-        
-        with r1:
-            st.markdown(f"**{lang['reactions']}**")
-            if res['reactions']:
-                rd = []
-                for n, (fx, fy) in res['reactions'].items():
-                    R = np.sqrt(fx**2+fy**2)
-                    a = np.degrees(np.arctan2(fy, fx))
-                    rd.append({lang['node']: n, lang['fx']: f"{fx:.2f}", lang['fy']: f"{fy:.2f}",
-                              lang['resultant']: f"{R:.2f}", lang['angle']: f"{a:.1f}"})
-                st.dataframe(pd.DataFrame(rd), hide_index=True, use_container_width=True)
-        
-        with r2:
-            st.markdown(f"**{lang['member_forces']}**")
-            if res['member_forces']:
-                fd = []
-                for m, f in res['member_forces'].items():
-                    fd.append({lang['member']: m, lang['force']: f"{abs(f):.2f}",
-                              lang['type']: lang['tension'] if f>=0 else lang['compression']})
-                st.dataframe(pd.DataFrame(fd), hide_index=True, use_container_width=True)
-        
-        with r3:
-            st.markdown(f"**{lang['displacements']}**")
-            dd = []
-            for i, n in enumerate(res['node_names']):
-                ux = res['displacements'][2*i] * 1000
-                uy = res['displacements'][2*i+1] * 1000
-                dd.append({lang['node']: n, lang['ux']: f"{ux:.3f}", lang['uy']: f"{uy:.3f}"})
-            st.dataframe(pd.DataFrame(dd), hide_index=True, use_container_width=True)
-        
-        if st.button(lang["export"]):
-            buf = io.StringIO()
-            buf.write("2D TRUSS ANALYSIS\n" + "="*40 + "\n\n")
-            buf.write("REACTIONS:\n")
-            for n, (fx, fy) in res['reactions'].items():
-                buf.write(f"  {n}: Fx={fx:.2f}, Fy={fy:.2f}, R={np.sqrt(fx**2+fy**2):.2f}\n")
-            buf.write("\nMEMBER FORCES:\n")
-            for m, f in res['member_forces'].items():
-                buf.write(f"  {m}: {abs(f):.2f} kN ({'T' if f>=0 else 'C'})\n")
-            buf.write("\nDISPLACEMENTS:\n")
-            for i, n in enumerate(res['node_names']):
-                buf.write(f"  {n}: Ux={res['displacements'][2*i]*1000:.3f} mm, Uy={res['displacements'][2*i+1]*1000:.3f} mm\n")
-            st.download_button("Download", buf.getvalue(), "truss_results.txt", "text/plain")
 
 if __name__ == "__main__":
     main()
