@@ -752,4 +752,311 @@ def main():
                 st.dataframe(df, hide_index=True, use_container_width=True)
             
             if len(st.session_state.nodes) >= 2:
-                with st.form("add_member", clear
+                with st.form("add_member", clear_on_submit=True):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        mid = st.text_input(lang['member_id'], key="mid_inp", placeholder="e.g. 1")
+                    with c2:
+                        sn = st.selectbox(lang['start_node'], 
+                                         list(st.session_state.nodes.keys()), key="sn_sel")
+                    with c3:
+                        en = st.selectbox(lang['end_node'], 
+                                         list(st.session_state.nodes.keys()), key="en_sel")
+                    
+                    if st.form_submit_button(lang['add_member']):
+                        try:
+                            mid_int = int(mid)
+                            if sn != en:
+                                st.session_state.members.append((mid_int, sn, en))
+                                st.rerun()
+                            else:
+                                st.error("Start and end nodes must be different")
+                        except:
+                            st.error("Invalid member ID")
+            
+            # Delete member
+            if st.session_state.members:
+                member_ids = [m[0] for m in st.session_state.members]
+                del_member = st.selectbox(lang['select_delete_member'], member_ids)
+                if st.button(lang['delete_member']):
+                    st.session_state.members = [m for m in st.session_state.members 
+                                               if m[0] != del_member]
+                    st.session_state.member_loads = [l for l in st.session_state.member_loads 
+                                                    if l[0] != del_member]
+                    st.rerun()
+        
+        with col_preview:
+            st.markdown(f"### {lang['live_preview']}")
+            fig = plot_truss(
+                st.session_state.nodes,
+                st.session_state.members,
+                st.session_state.supports,
+                st.session_state.joint_loads,
+                st.session_state.member_loads,
+                lang_dict=lang
+            )
+            st.pyplot(fig)
+    
+    # ===== SUPPORTS TAB =====
+    with tab3:
+        col_input, col_preview = st.columns([1, 1.2])
+        
+        with col_input:
+            st.markdown(f"### {lang['support_table']}")
+            
+            if st.session_state.supports:
+                sup_list = []
+                for nid, stype in st.session_state.supports.items():
+                    sup_list.append({"Node": nid, "Support Type": stype})
+                df = pd.DataFrame(sup_list)
+                st.dataframe(df, hide_index=True, use_container_width=True)
+            
+            if st.session_state.nodes:
+                with st.form("add_support", clear_on_submit=True):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        snode = st.selectbox(lang['support_node'],
+                                            list(st.session_state.nodes.keys()), key="sup_n")
+                    with c2:
+                        stype = st.selectbox(lang['support_type'],
+                                            lang['support_types'], key="sup_t")
+                    
+                    if st.form_submit_button(lang['add_support']):
+                        type_map = {
+                            lang['support_types'][0]: 'pinned',
+                            lang['support_types'][1]: 'roller_x',
+                            lang['support_types'][2]: 'roller_y'
+                        }
+                        st.session_state.supports[snode] = type_map[stype]
+                        st.rerun()
+            
+            # Delete support
+            if st.session_state.supports:
+                del_sup = st.selectbox(lang['select_delete_support'],
+                                      list(st.session_state.supports.keys()))
+                if st.button(lang['delete_support']):
+                    del st.session_state.supports[del_sup]
+                    st.rerun()
+        
+        with col_preview:
+            st.markdown(f"### {lang['live_preview']}")
+            fig = plot_truss(
+                st.session_state.nodes,
+                st.session_state.members,
+                st.session_state.supports,
+                st.session_state.joint_loads,
+                st.session_state.member_loads,
+                lang_dict=lang
+            )
+            st.pyplot(fig)
+    
+    # ===== LOADS TAB =====
+    with tab4:
+        col_input, col_preview = st.columns([1, 1.2])
+        
+        with col_input:
+            st.markdown(f"### {lang['load_table']}")
+            
+            all_loads_display = []
+            for nid, (mag, ang) in st.session_state.joint_loads.items():
+                all_loads_display.append({"Type": "Joint", "Node/Member": f"Node {nid}", 
+                                         "Magnitude (kN)": mag, "Angle (°)": ang})
+            for mid, mag, ang in st.session_state.member_loads:
+                all_loads_display.append({"Type": "Member", "Node/Member": f"Member {mid}",
+                                         "Magnitude (kN)": mag, "Angle (°)": ang})
+            
+            if all_loads_display:
+                df = pd.DataFrame(all_loads_display)
+                st.dataframe(df, hide_index=True, use_container_width=True)
+            
+            with st.form("add_load", clear_on_submit=True):
+                # Load type selector
+                load_type = st.selectbox(lang['load_type'], lang['load_types'], key="lt")
+                
+                if load_type == lang['load_types'][0]:  # Joint load
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        lnode = st.selectbox(lang['load_node'],
+                                            list(st.session_state.nodes.keys()) if st.session_state.nodes else [0],
+                                            key="jl_n")
+                    with c2:
+                        mag = st.text_input(lang['load_magnitude'], key="jl_mag", placeholder="e.g. 10")
+                    with c3:
+                        ang = st.text_input(lang['load_angle'], key="jl_ang", placeholder="e.g. 270")
+                    
+                    if st.form_submit_button(lang['add_load']):
+                        try:
+                            mag_f = float(mag)
+                            ang_f = float(ang)
+                            st.session_state.joint_loads[lnode] = (mag_f, ang_f)
+                            st.rerun()
+                        except:
+                            st.error("Invalid numbers")
+                
+                else:  # Member load
+                    member_ids = [m[0] for m in st.session_state.members] if st.session_state.members else [0]
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        lmember = st.selectbox(lang['load_member'], member_ids, key="ml_m")
+                    with c2:
+                        mag = st.text_input(lang['load_magnitude'], key="ml_mag", placeholder="e.g. 10")
+                    with c3:
+                        ang = st.text_input(lang['load_angle'], key="ml_ang", placeholder="e.g. 270")
+                    
+                    if st.form_submit_button(lang['add_load']):
+                        try:
+                            mag_f = float(mag)
+                            ang_f = float(ang)
+                            st.session_state.member_loads.append((lmember, mag_f, ang_f))
+                            st.rerun()
+                        except:
+                            st.error("Invalid numbers")
+            
+            # Delete load
+            if all_loads_display:
+                load_options = []
+                for nid in st.session_state.joint_loads:
+                    load_options.append(f"Joint at Node {nid}")
+                for i, (mid, _, _) in enumerate(st.session_state.member_loads):
+                    load_options.append(f"Member load #{i+1} on Member {mid}")
+                
+                del_load = st.selectbox(lang['select_delete_load'], load_options)
+                if st.button(lang['delete_load']):
+                    if "Joint" in del_load:
+                        node_id = int(del_load.split("Node ")[1])
+                        del st.session_state.joint_loads[node_id]
+                    else:
+                        idx = int(del_load.split("#")[1].split(" ")[0]) - 1
+                        st.session_state.member_loads.pop(idx)
+                    st.rerun()
+        
+        with col_preview:
+            st.markdown(f"### {lang['live_preview']}")
+            fig = plot_truss(
+                st.session_state.nodes,
+                st.session_state.members,
+                st.session_state.supports,
+                st.session_state.joint_loads,
+                st.session_state.member_loads,
+                lang_dict=lang
+            )
+            st.pyplot(fig)
+    
+    # Analyze & Reset buttons
+    st.markdown("---")
+    col_a, col_r = st.columns([2, 1])
+    with col_a:
+        if st.button(lang['analyze_btn'], use_container_width=True, type="primary"):
+            if len(st.session_state.nodes) >= 2 and len(st.session_state.members) >= 1:
+                with st.spinner("Analyzing..."):
+                    try:
+                        analyzer = TrussAnalyzer(
+                            nodes=st.session_state.nodes,
+                            members=st.session_state.members,
+                            supports=st.session_state.supports,
+                            joint_loads=st.session_state.joint_loads,
+                            member_loads=st.session_state.member_loads
+                        )
+                        
+                        if analyzer.U_global is not None:
+                            st.session_state.results = {
+                                'reactions': analyzer.reactions,
+                                'member_forces': analyzer.member_forces,
+                                'displacements': analyzer.U_global
+                            }
+                            st.success("✅ Analysis complete!")
+                        else:
+                            st.error(lang['error_structure'])
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+            else:
+                st.warning(lang['warning_min'])
+    
+    with col_r:
+        if st.button(lang['reset_btn'], use_container_width=True):
+            for key in ['nodes', 'members', 'supports', 'joint_loads', 'member_loads', 'results']:
+                st.session_state[key] = {} if key in ['nodes', 'supports', 'joint_loads'] else []
+            st.rerun()
+    
+    # ===== RESULTS =====
+    if st.session_state.results:
+        st.markdown("---")
+        st.markdown("## 📊 Analysis Results")
+        
+        res = st.session_state.results
+        
+        rt1, rt2, rt3 = st.columns(3)
+        
+        with rt1:
+            st.markdown(f"### {lang['reactions_title']}")
+            if res['reactions']:
+                rdata = []
+                for nid, (fx, fy) in res['reactions'].items():
+                    R = np.sqrt(fx**2 + fy**2)
+                    ang = np.degrees(np.arctan2(fy, fx))
+                    rdata.append({
+                        lang['node_id_col']: nid,
+                        lang['fx']: round(fx, 3),
+                        lang['fy']: round(fy, 3),
+                        lang['resultant']: round(R, 3),
+                        lang['angle']: round(ang, 1)
+                    })
+                st.dataframe(pd.DataFrame(rdata), hide_index=True, use_container_width=True)
+        
+        with rt2:
+            st.markdown(f"### {lang['member_forces_title']}")
+            if res['member_forces']:
+                fdata = []
+                for mid, force in res['member_forces'].items():
+                    fdata.append({
+                        lang['member_id_col']: mid,
+                        lang['force']: round(abs(force), 3),
+                        lang['type']: lang['tension'] if force >= 0 else lang['compression']
+                    })
+                st.dataframe(pd.DataFrame(fdata), hide_index=True, use_container_width=True)
+        
+        with rt3:
+            st.markdown(f"### {lang['displacements_title']}")
+            ddata = []
+            for nid in st.session_state.nodes:
+                dof_x, dof_y = 2*(nid-1), 2*(nid-1)+1
+                ddata.append({
+                    lang['node_id_col']: nid,
+                    lang['ux']: round(res['displacements'][dof_x] * 1000, 4),
+                    lang['uy']: round(res['displacements'][dof_y] * 1000, 4)
+                })
+            st.dataframe(pd.DataFrame(ddata), hide_index=True, use_container_width=True)
+        
+        # Result visualization
+        st.markdown(f"### {lang['live_preview']} with Results")
+        fig = plot_truss(
+            st.session_state.nodes,
+            st.session_state.members,
+            st.session_state.supports,
+            st.session_state.joint_loads,
+            st.session_state.member_loads,
+            member_forces=res['member_forces'],
+            reactions=res['reactions'],
+            lang_dict=lang
+        )
+        st.pyplot(fig)
+        
+        # Export
+        if st.button(lang['export_btn']):
+            buf = io.StringIO()
+            buf.write("2D TRUSS ANALYSIS RESULTS\n" + "="*40 + "\n\n")
+            for nid, (fx, fy) in res['reactions'].items():
+                R = np.sqrt(fx**2 + fy**2)
+                buf.write(f"Reaction Node {nid}: Fx={fx:.3f}, Fy={fy:.3f}, R={R:.3f}\n")
+            buf.write("\n")
+            for mid, f in res['member_forces'].items():
+                buf.write(f"Member {mid}: {abs(f):.3f} kN ({'T' if f>=0 else 'C'})\n")
+            
+            st.download_button("Download TXT", buf.getvalue(), 
+                             "truss_results.txt", "text/plain")
+    
+    else:
+        st.info(lang['no_results'])
+
+if __name__ == "__main__":
+    main()
