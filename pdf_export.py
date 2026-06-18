@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 import datetime
 from typing import Dict, List, Any
-import plotly.io as pio
+# (remove this line entirely)
 
 class PDFExporter:
     """Generates professional PDF reports for truss analysis."""
