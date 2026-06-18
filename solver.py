@@ -1,6 +1,6 @@
 """
 Direct Stiffness Method solver for 2D truss analysis.
-Implements the matrix stiffness method with proper coordinate transformations.
+Properly handles support conditions and calculates reactions.
 """
 
 import numpy as np
@@ -38,9 +38,7 @@ class Load:
     angle: float  # degrees, counterclockwise from positive X
 
 class TrussSolver:
-    """
-    Solves 2D truss structures using the Direct Stiffness Method.
-    """
+    """Solves 2D truss structures using the Direct Stiffness Method."""
     
     def __init__(self, nodes: List[Node], members: List[Member], 
                  supports: List[Support], loads: List[Load]):
@@ -50,12 +48,12 @@ class TrussSolver:
         self.loads = loads
         
         # Results storage
-        self.displacements: Optional[Dict[str, np.ndarray]] = None
-        self.reactions: Optional[Dict[str, np.ndarray]] = None
-        self.member_forces: Optional[Dict[str, float]] = None
+        self.displacements = None
+        self.reactions = None
+        self.member_forces = None
         
-        # Global DOF mapping
-        self.node_dof_map: Dict[str, int] = {}
+        # Build DOF mapping
+        self.node_dof_map = {}
         self._build_dof_mapping()
     
     def _build_dof_mapping(self):
@@ -63,130 +61,98 @@ class TrussSolver:
         dof_count = 0
         for node_name in sorted(self.nodes.keys()):
             self.node_dof_map[node_name] = dof_count
-            dof_count += 2  # 2 DOFs per node (x, y)
+            dof_count += 2
     
-    def _get_node_dofs(self, node_name: str) -> Tuple[int, int]:
+    def _get_node_dofs(self, node_name):
         """Get global DOF indices for a node."""
         start_idx = self.node_dof_map[node_name]
         return start_idx, start_idx + 1
     
-    def _calculate_member_length(self, member: Member) -> float:
-        """Calculate the length of a member."""
+    def _calculate_member_properties(self, member):
+        """Calculate length and direction cosines for a member."""
         start = self.nodes[member.start_node]
         end = self.nodes[member.end_node]
         dx = end.x - start.x
         dy = end.y - start.y
-        return math.sqrt(dx**2 + dy**2)
-    
-    def _calculate_direction_cosines(self, member: Member) -> Tuple[float, float]:
-        """Calculate direction cosines (cx, cy) for a member."""
-        start = self.nodes[member.start_node]
-        end = self.nodes[member.end_node]
-        length = self._calculate_member_length(member)
+        length = math.sqrt(dx**2 + dy**2)
         
         if length < 1e-10:
             raise ValueError(f"Zero-length member: {member.name}")
         
-        cx = (end.x - start.x) / length
-        cy = (end.y - start.y) / length
-        return cx, cy
+        cx = dx / length
+        cy = dy / length
+        return length, cx, cy
     
-    def _create_local_stiffness_matrix(self, member: Member) -> np.ndarray:
-        """Create 4x4 local stiffness matrix for a truss element."""
-        length = self._calculate_member_length(member)
-        EA = 1.0  # Assume EA = 1 (unit stiffness)
-        
-        # Local stiffness matrix (4x4)
-        k_local = (EA / length) * np.array([
-            [1, 0, -1, 0],
-            [0, 0, 0, 0],
-            [-1, 0, 1, 0],
-            [0, 0, 0, 0]
-        ])
-        
-        return k_local
-    
-    def _create_transformation_matrix(self, cx: float, cy: float) -> np.ndarray:
-        """Create 4x4 transformation matrix from local to global coordinates."""
-        T = np.array([
-            [cx, cy, 0, 0],
-            [-cy, cx, 0, 0],
-            [0, 0, cx, cy],
-            [0, 0, -cy, cx]
-        ])
-        return T
-    
-    def _get_global_stiffness_matrix(self, member: Member) -> np.ndarray:
+    def _get_member_stiffness_global(self, member):
         """Get member stiffness matrix in global coordinates."""
-        cx, cy = self._calculate_direction_cosines(member)
-        k_local = self._create_local_stiffness_matrix(member)
-        T = self._create_transformation_matrix(cx, cy)
-        return T.T @ k_local @ T
+        length, cx, cy = self._calculate_member_properties(member)
+        EA = 1.0  # Unit stiffness for now
+        
+        # Element stiffness in global coordinates (4x4)
+        k = (EA / length) * np.array([
+            [cx*cx, cx*cy, -cx*cx, -cx*cy],
+            [cx*cy, cy*cy, -cx*cy, -cy*cy],
+            [-cx*cx, -cx*cy, cx*cx, cx*cy],
+            [-cx*cy, -cy*cy, cx*cy, cy*cy]
+        ])
+        
+        return k
     
-    def _get_constrained_dofs(self) -> List[int]:
+    def _get_support_constraints(self):
         """
-        Get list of constrained DOF indices based on support conditions.
-        Returns list of DOF indices that are fixed.
+        Determine which DOFs are constrained by supports.
+        Returns a list of constrained DOF indices.
         """
-        constrained_dofs = []
+        constrained = []
         
         for support in self.supports:
-            node_name = support.node
-            if node_name not in self.nodes:
+            if support.node not in self.nodes:
                 continue
             
-            dof_x, dof_y = self._get_node_dofs(node_name)
-            angle_rad = math.radians(support.angle)
+            dof_x, dof_y = self._get_node_dofs(support.node)
             
-            if support.type == 'fixed':
-                # Fixed: constrain both X and Y
-                constrained_dofs.extend([dof_x, dof_y])
-            elif support.type == 'pinned':
-                # Pinned: constrain both X and Y (like fixed for 2D truss)
-                constrained_dofs.extend([dof_x, dof_y])
-            elif support.type == 'roller':
-                # Roller: constrain perpendicular to the rolling direction
-                # The roller allows movement ALONG the support surface
-                # Support angle defines the direction of the normal (constrained direction)
-                normal_x = math.cos(angle_rad)
-                normal_y = math.sin(angle_rad)
+            if support.type == 'fixed' or support.type == 'pinned':
+                # Both DOFs constrained
+                constrained.append(dof_x)
+                constrained.append(dof_y)
                 
-                # If normal is closer to X direction, constrain X
-                if abs(normal_x) > abs(normal_y):
-                    constrained_dofs.append(dof_x)
+            elif support.type == 'roller':
+                # One DOF constrained based on angle
+                angle_rad = math.radians(support.angle)
+                
+                # The normal direction (perpendicular to rolling surface)
+                # is what's constrained
+                if abs(math.cos(angle_rad)) >= abs(math.sin(angle_rad)):
+                    constrained.append(dof_x)
                 else:
-                    constrained_dofs.append(dof_y)
+                    constrained.append(dof_y)
         
-        return constrained_dofs
+        return sorted(set(constrained))
     
-    def solve(self) -> bool:
-        """
-        Solve the truss structure using Direct Stiffness Method.
-        Returns True if solution converged, False otherwise.
-        """
+    def solve(self):
+        """Solve the truss structure."""
         try:
             total_dofs = len(self.nodes) * 2
             
-            # Initialize global stiffness matrix and force vector
-            K_global = np.zeros((total_dofs, total_dofs))
-            F = np.zeros(total_dofs)
+            # Initialize global stiffness matrix
+            K = np.zeros((total_dofs, total_dofs))
             
             # Assemble global stiffness matrix
             for member in self.members:
                 if member.start_node not in self.nodes or member.end_node not in self.nodes:
                     continue
                 
-                k_global_member = self._get_global_stiffness_matrix(member)
-                dof_start_x, dof_start_y = self._get_node_dofs(member.start_node)
-                dof_end_x, dof_end_y = self._get_node_dofs(member.end_node)
+                k_member = self._get_member_stiffness_global(member)
+                dof_start = list(self._get_node_dofs(member.start_node))
+                dof_end = list(self._get_node_dofs(member.end_node))
+                dof_indices = dof_start + dof_end
                 
-                # Assembly indices
-                indices = [dof_start_x, dof_start_y, dof_end_x, dof_end_y]
                 for i in range(4):
                     for j in range(4):
-                        K_global[indices[i], indices[j]] += k_global_member[i, j]
+                        K[dof_indices[i], dof_indices[j]] += k_member[i, j]
             
             # Build force vector
+            F = np.zeros(total_dofs)
             for load in self.loads:
                 if load.node not in self.nodes:
                     continue
@@ -196,32 +162,43 @@ class TrussSolver:
                 F[dof_y] += load.magnitude * math.sin(angle_rad)
             
             # Get constrained DOFs
-            constrained_dofs = self._get_constrained_dofs()
-            constrained_dofs = sorted(set(constrained_dofs))  # Remove duplicates and sort
-            free_dofs = [i for i in range(total_dofs) if i not in constrained_dofs]
+            constrained = self._get_support_constraints()
+            free = [i for i in range(total_dofs) if i not in constrained]
             
-            if not free_dofs:
-                return False  # All DOFs constrained
+            # DEBUG: Print info about the system
+            print(f"Total DOFs: {total_dofs}")
+            print(f"Free DOFs: {free}")
+            print(f"Constrained DOFs: {constrained}")
+            print(f"Number of supports: {len(self.supports)}")
+            print(f"Number of members: {len(self.members)}")
+            print(f"Force vector: {F}")
             
-            # Extract free DOF submatrices
-            K_ff = K_global[np.ix_(free_dofs, free_dofs)]
-            K_fc = K_global[np.ix_(free_dofs, constrained_dofs)]
-            K_cf = K_global[np.ix_(constrained_dofs, free_dofs)]
-            K_cc = K_global[np.ix_(constrained_dofs, constrained_dofs)]
-            
-            F_f = F[free_dofs]
-            
-            # Check for singularity
-            if np.linalg.cond(K_ff) > 1e12:
+            if len(free) == 0:
+                print("ERROR: All DOFs are constrained")
                 return False
             
-            # Solve for displacements (free DOFs only)
+            # Partition matrices
+            K_ff = K[np.ix_(free, free)]
+            F_f = F[free]
+            
+            print(f"K_ff shape: {K_ff.shape}")
+            print(f"K_ff:\n{K_ff}")
+            print(f"K_ff rank: {np.linalg.matrix_rank(K_ff)}")
+            
+            # Check conditioning
+            cond = np.linalg.cond(K_ff)
+            print(f"Condition number: {cond}")
+            
+            if cond > 1e10:
+                print("ERROR: Matrix is nearly singular")
+                return False
+            
+            # Solve for free displacements
             U_f = np.linalg.solve(K_ff, F_f)
             
-            # Reconstruct full displacement vector
+            # Build complete displacement vector
             U = np.zeros(total_dofs)
-            U[free_dofs] = U_f
-            # Constrained DOFs have zero displacement (already zero)
+            U[free] = U_f
             
             # Store displacements
             self.displacements = {}
@@ -229,27 +206,21 @@ class TrussSolver:
                 dof_x, dof_y = self._get_node_dofs(node_name)
                 self.displacements[node_name] = np.array([U[dof_x], U[dof_y]])
             
-            # Calculate reactions using the FULL stiffness matrix
-            # Reactions = K * U - F_applied (for constrained DOFs)
+            # Calculate ALL nodal forces (internal)
+            F_internal = K @ U
+            
+            # Reactions are the internal forces at constrained DOFs
+            # minus any applied loads at those DOFs
             self.reactions = {}
-            
-            # Method: R = K * U (gives forces at all DOFs)
-            all_forces = K_global @ U
-            
-            # Reactions are the forces at constrained DOFs
-            # But we need to subtract any applied loads at those DOFs
             for support in self.supports:
-                node_name = support.node
-                if node_name not in self.nodes:
+                if support.node not in self.nodes:
                     continue
+                dof_x, dof_y = self._get_node_dofs(support.node)
                 
-                dof_x, dof_y = self._get_node_dofs(node_name)
+                rx = F_internal[dof_x] - F[dof_x]
+                ry = F_internal[dof_y] - F[dof_y]
                 
-                # Reaction = Internal force - Applied load at that DOF
-                rx = all_forces[dof_x] - F[dof_x]
-                ry = all_forces[dof_y] - F[dof_y]
-                
-                self.reactions[node_name] = np.array([rx, ry])
+                self.reactions[support.node] = np.array([rx, ry])
             
             # Calculate member forces
             self.member_forces = {}
@@ -257,29 +228,32 @@ class TrussSolver:
                 if member.start_node not in self.nodes or member.end_node not in self.nodes:
                     continue
                 
-                cx, cy = self._calculate_direction_cosines(member)
-                length = self._calculate_member_length(member)
+                length, cx, cy = self._calculate_member_properties(member)
                 EA = 1.0
                 
-                # Get displacements at both ends
                 start_disp = self.displacements[member.start_node]
                 end_disp = self.displacements[member.end_node]
                 
-                # Transform to local coordinates
-                u_local_start = cx * start_disp[0] + cy * start_disp[1]
-                u_local_end = cx * end_disp[0] + cy * end_disp[1]
+                # Axial deformation in local coordinates
+                u_start = cx * start_disp[0] + cy * start_disp[1]
+                u_end = cx * end_disp[0] + cy * end_disp[1]
                 
-                # Axial force (positive = tension)
-                force = (EA / length) * (u_local_end - u_local_start)
+                # Force = EA/L * (elongation)
+                force = (EA / length) * (u_end - u_start)
                 self.member_forces[member.name] = force
             
             return True
             
+        except np.linalg.LinAlgError as e:
+            print(f"Linear algebra error: {e}")
+            return False
         except Exception as e:
-            print(f"Solution error: {e}")
+            print(f"Solver error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
-    def get_reaction_resultant(self, support_node: str) -> Tuple[float, float]:
+    def get_reaction_resultant(self, support_node):
         """Get reaction force resultant magnitude and direction."""
         if self.reactions is None or support_node not in self.reactions:
             return 0.0, 0.0
@@ -292,26 +266,25 @@ class TrussSolver:
         angle = math.degrees(math.atan2(reaction[1], reaction[0]))
         return magnitude, angle
     
-    def validate_structure(self) -> List[str]:
-        """
-        Validate the structure and return list of error messages.
-        Returns empty list if structure is valid.
-        """
+    def validate_structure(self):
+        """Validate the structure."""
         errors = []
         
-        # Check for nodes
         if not self.nodes:
             errors.append('No nodes defined')
         
-        # Check for members
         if not self.members:
             errors.append('No members defined')
         
-        # Check for supports
         if not self.supports:
-            errors.append('No supports defined')
+            errors.append('No supports defined - structure needs supports to be stable')
         
-        # Check member connections
+        # Check minimum supports for stability
+        if self.supports:
+            constrained_dofs = self._get_support_constraints()
+            if len(constrained_dofs) < 3:
+                errors.append(f'Structure may be unstable: only {len(constrained_dofs)} DOFs constrained. Need at least 3 for 2D stability.')
+        
         for member in self.members:
             if member.start_node not in self.nodes:
                 errors.append(f"Member {member.name}: Start node '{member.start_node}' not found")
@@ -320,7 +293,6 @@ class TrussSolver:
             if member.start_node == member.end_node:
                 errors.append(f"Member {member.name}: Zero-length member")
         
-        # Check load nodes exist
         for load in self.loads:
             if load.node not in self.nodes:
                 errors.append(f"Load {load.name}: Node '{load.node}' not found")
