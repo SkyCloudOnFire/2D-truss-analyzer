@@ -123,17 +123,25 @@ def get_css(theme: Literal['light', 'dark']) -> str:
         }}
         
         /* Primary Button */
-        .primary-button > button {{
-            background-color: {colors['accent']};
-            color: white;
-            border: none;
-            font-weight: 600;
-        }}
-        
-        .primary-button > button:hover {{
-            background-color: {colors['accent_hover']};
-            color: white;
-        }}
+.primary-button > button {{
+    background-color: {colors['accent']};
+    color: white;
+    border: none;
+    font-weight: 600;
+}}
+
+.primary-button > button:hover {{
+    background-color: {colors['accent_hover']};
+    color: white;
+}}
+
+/* Success flash on add buttons */
+.stButton > button:active {{
+    background-color: {colors['success']} !important;
+    border-color: {colors['success']} !important;
+    color: white !important;
+    transition: background-color 0.15s ease;
+}}
         
         /* Input Fields - Text Input */
         .stTextInput input {{
