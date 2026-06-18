@@ -102,27 +102,41 @@ def get_css(theme: Literal['light', 'dark']) -> str:
         }}
         
         /* Button Styles */
-        .stButton > button {{
-            border-radius: 8px;
-            font-weight: 500;
-            font-size: 0.875rem;
-            padding: 0.5rem 1rem;
-            transition: all 0.2s ease;
-            border: 1px solid {colors['border']};
-            background-color: {colors['bg_card']};
-            color: {colors['text_primary']};
-        }}
-        
-        .stButton > button:hover {{
-            border-color: {colors['accent']};
-            color: {colors['accent']};
-        }}
-        
-        .stButton > button:active {{
+.stButton > button {{
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+    border: 1px solid {colors['border']};
+    background-color: {colors['bg_card']};
+    color: {colors['text_primary']};
+}}
+
+.stButton > button:hover {{
+    border-color: {colors['accent']};
+    color: {colors['accent']};
+}}
+
+.stButton > button:active {{
     transform: scale(0.98);
     background-color: {colors['accent']} !important;
     border-color: {colors['accent']} !important;
     color: white !important;
+}}
+
+.stButton > button:focus {{
+    background-color: {colors['accent']} !important;
+    border-color: {colors['accent']} !important;
+    color: white !important;
+    outline: none !important;
+}}
+
+.stButton > button:focus:not(:focus-visible) {{
+    background-color: {colors['accent']} !important;
+    border-color: {colors['accent']} !important;
+    color: white !important;
+    outline: none !important;
 }}
         
         /* Primary Button */
