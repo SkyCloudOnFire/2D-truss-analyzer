@@ -26,6 +26,7 @@ class ThemeColors:
         'compression': '#EF4444',  # Red for compression
         'shadow': '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
         'card_shadow': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+        'input_bg': '#FFFFFF',
     }
     
     DARK = {
@@ -44,6 +45,7 @@ class ThemeColors:
         'compression': '#F87171',
         'shadow': '0 1px 3px 0 rgba(0, 0, 0, 0.3)',
         'card_shadow': '0 1px 2px 0 rgba(0, 0, 0, 0.2)',
+        'input_bg': '#1E293B',
     }
 
 def get_css(theme: Literal['light', 'dark']) -> str:
@@ -133,20 +135,64 @@ def get_css(theme: Literal['light', 'dark']) -> str:
             color: white;
         }}
         
-        /* Input Fields */
-        .stTextInput > div > div > input,
-        .stNumberInput > div > div > input,
-        .stSelectbox > div > div {{
-            background-color: {colors['bg_card']};
-            border: 1px solid {colors['border']};
-            border-radius: 8px;
-            color: {colors['text_primary']};
+        /* Input Fields - Text Input */
+        .stTextInput input {{
+            background-color: {colors['input_bg']} !important;
+            border: 1px solid {colors['border']} !important;
+            border-radius: 8px !important;
+            color: {colors['text_primary']} !important;
+            font-size: 0.875rem !important;
+            padding: 0.5rem 0.75rem !important;
+            min-height: 40px !important;
+            box-shadow: none !important;
         }}
         
-        .stTextInput > div > div > input:focus,
-        .stNumberInput > div > div > input:focus {{
-            border-color: {colors['accent']};
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        .stTextInput input:focus {{
+            border-color: {colors['accent']} !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+            outline: none !important;
+        }}
+        
+        /* Input Fields - Number Input */
+        .stNumberInput input {{
+            background-color: {colors['input_bg']} !important;
+            border: 1px solid {colors['border']} !important;
+            border-radius: 8px !important;
+            color: {colors['text_primary']} !important;
+            font-size: 0.875rem !important;
+            padding: 0.5rem 0.75rem !important;
+            min-height: 40px !important;
+            box-shadow: none !important;
+        }}
+        
+        .stNumberInput input:focus {{
+            border-color: {colors['accent']} !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+            outline: none !important;
+        }}
+        
+        .stNumberInput input::placeholder {{
+            color: {colors['text_secondary']} !important;
+            opacity: 0.6 !important;
+        }}
+        
+        /* Hide number input spinner */
+        .stNumberInput input[type="number"]::-webkit-inner-spin-button,
+        .stNumberInput input[type="number"]::-webkit-outer-spin-button {{
+            opacity: 0.3;
+        }}
+        
+        .stNumberInput [data-testid="stNumberInputStepButton"] {{
+            display: none !important;
+        }}
+        
+        /* Input Fields - Selectbox */
+        .stSelectbox > div > div {{
+            background-color: {colors['input_bg']} !important;
+            border: 1px solid {colors['border']} !important;
+            border-radius: 8px !important;
+            color: {colors['text_primary']} !important;
+            font-size: 0.875rem !important;
         }}
         
         /* Data Table */
