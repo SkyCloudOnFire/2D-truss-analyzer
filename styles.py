@@ -119,8 +119,11 @@ def get_css(theme: Literal['light', 'dark']) -> str:
         }}
         
         .stButton > button:active {{
-            transform: scale(0.98);
-        }}
+    transform: scale(0.98);
+    background-color: {colors['accent']} !important;
+    border-color: {colors['accent']} !important;
+    color: white !important;
+}}
         
         /* Primary Button */
 .primary-button > button {{
@@ -133,14 +136,6 @@ def get_css(theme: Literal['light', 'dark']) -> str:
 .primary-button > button:hover {{
     background-color: {colors['accent_hover']};
     color: white;
-}}
-
-/* Success flash on add buttons */
-.stButton > button:active {{
-    background-color: {colors['success']} !important;
-    border-color: {colors['success']} !important;
-    color: white !important;
-    transition: background-color 0.15s ease;
 }}
         
         /* Input Fields - Text Input */
