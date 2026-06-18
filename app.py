@@ -367,36 +367,44 @@ data_tabs = st.tabs([
 with data_tabs[0]:
     if st.session_state.nodes:
         nodes_df = pd.DataFrame([
-            {'Name': n.name, 'X': n.x, 'Y': n.y}
+            {'': False, 'Name': n.name, 'X': n.x, 'Y': n.y}
             for n in st.session_state.nodes
         ])
-        st.dataframe(nodes_df, use_container_width=True, hide_index=True)
         
-        # Single delete with selection
-        node_names = [n.name for n in st.session_state.nodes]
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            node_to_delete = st.selectbox(
-                "Select node to delete",
-                options=node_names,
-                key='delete_node_select',
-                label_visibility='collapsed'
-            )
-        with col2:
-            if st.button(loc('delete'), key='delete_node_btn', use_container_width=True):
-                st.session_state.show_delete_confirm = 'node'
+        edited_df = st.data_editor(
+            nodes_df,
+            column_config={
+                '': st.column_config.CheckboxColumn('Select'),
+                'Name': 'Name',
+                'X': st.column_config.NumberColumn('X', format="%.2f"),
+                'Y': st.column_config.NumberColumn('Y', format="%.2f")
+            },
+            hide_index=True,
+            use_container_width=True,
+            disabled=['Name', 'X', 'Y'],
+            key='nodes_editor'
+        )
         
-        if st.session_state.show_delete_confirm == 'node':
-            st.warning(f"{loc('confirm_delete')} ({node_to_delete})")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(loc('confirm'), key='confirm_node_delete', use_container_width=True):
-                    idx = next(i for i, n in enumerate(st.session_state.nodes) if n.name == node_to_delete)
-                    st.session_state.nodes.pop(idx)
+        selected = edited_df[edited_df[''] == True].index.tolist()
+        
+        if selected:
+            if st.button(loc('delete'), type='secondary', key='delete_nodes'):
+                if st.session_state.show_delete_confirm == 'nodes':
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.nodes.pop(idx)
                     st.session_state.show_delete_confirm = None
                     st.rerun()
-            with col2:
-                if st.button(loc('cancel'), key='cancel_node_delete', use_container_width=True):
+                else:
+                    st.session_state.show_delete_confirm = 'nodes'
+                    st.warning(f"{loc('confirm_delete')} ({len(selected)} items)")
+            
+            if st.session_state.show_delete_confirm == 'nodes':
+                if st.button(loc('confirm'), type='primary', key='confirm_nodes'):
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.nodes.pop(idx)
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
+                if st.button(loc('cancel'), key='cancel_nodes'):
                     st.session_state.show_delete_confirm = None
                     st.rerun()
 
@@ -404,69 +412,89 @@ with data_tabs[0]:
 with data_tabs[1]:
     if st.session_state.members:
         members_df = pd.DataFrame([
-            {'Name': m.name, 'Start': m.start_node, 'End': m.end_node}
+            {'': False, 'Name': m.name, 'Start': m.start_node, 'End': m.end_node}
             for m in st.session_state.members
         ])
-        st.dataframe(members_df, use_container_width=True, hide_index=True)
         
-        member_names = [m.name for m in st.session_state.members]
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            member_to_delete = st.selectbox(
-                "Select member to delete",
-                options=member_names,
-                key='delete_member_select',
-                label_visibility='collapsed'
-            )
-        with col2:
-            if st.button(loc('delete'), key='delete_member_btn', use_container_width=True):
-                st.session_state.show_delete_confirm = 'member'
+        edited_df = st.data_editor(
+            members_df,
+            column_config={
+                '': st.column_config.CheckboxColumn('Select'),
+                'Name': 'Name',
+                'Start': 'Start Node',
+                'End': 'End Node'
+            },
+            hide_index=True,
+            use_container_width=True,
+            disabled=['Name', 'Start', 'End'],
+            key='members_editor'
+        )
         
-        if st.session_state.show_delete_confirm == 'member':
-            st.warning(f"{loc('confirm_delete')} ({member_to_delete})")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(loc('confirm'), key='confirm_member_delete', use_container_width=True):
-                    idx = next(i for i, m in enumerate(st.session_state.members) if m.name == member_to_delete)
-                    st.session_state.members.pop(idx)
+        selected = edited_df[edited_df[''] == True].index.tolist()
+        
+        if selected:
+            if st.button(loc('delete'), type='secondary', key='delete_members'):
+                if st.session_state.show_delete_confirm == 'members':
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.members.pop(idx)
                     st.session_state.show_delete_confirm = None
                     st.rerun()
-            with col2:
-                if st.button(loc('cancel'), key='cancel_member_delete', use_container_width=True):
+                else:
+                    st.session_state.show_delete_confirm = 'members'
+                    st.warning(f"{loc('confirm_delete')} ({len(selected)} items)")
+            
+            if st.session_state.show_delete_confirm == 'members':
+                if st.button(loc('confirm'), type='primary', key='confirm_members'):
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.members.pop(idx)
                     st.session_state.show_delete_confirm = None
-                    # Supports Table
+                    st.rerun()
+                if st.button(loc('cancel'), key='cancel_members'):
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
+                    
+# Supports Table
 with data_tabs[2]:
     if st.session_state.supports:
         supports_df = pd.DataFrame([
-            {'Node': s.node, 'Type': loc(s.type), 'Angle': f"{s.angle}°"}
+            {'': False, 'Node': s.node, 'Type': loc(s.type), 'Angle': f"{s.angle}°"}
             for s in st.session_state.supports
         ])
-        st.dataframe(supports_df, use_container_width=True, hide_index=True)
         
-        support_nodes = [s.node for s in st.session_state.supports]
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            support_to_delete = st.selectbox(
-                "Select support to delete",
-                options=support_nodes,
-                key='delete_support_select',
-                label_visibility='collapsed'
-            )
-        with col2:
-            if st.button(loc('delete'), key='delete_support_btn', use_container_width=True):
-                st.session_state.show_delete_confirm = 'support'
+        edited_df = st.data_editor(
+            supports_df,
+            column_config={
+                '': st.column_config.CheckboxColumn('Select'),
+                'Node': 'Node',
+                'Type': 'Type',
+                'Angle': 'Angle'
+            },
+            hide_index=True,
+            use_container_width=True,
+            disabled=['Node', 'Type', 'Angle'],
+            key='supports_editor'
+        )
         
-        if st.session_state.show_delete_confirm == 'support':
-            st.warning(f"{loc('confirm_delete')} (support at {support_to_delete})")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(loc('confirm'), key='confirm_support_delete', use_container_width=True):
-                    idx = next(i for i, s in enumerate(st.session_state.supports) if s.node == support_to_delete)
-                    st.session_state.supports.pop(idx)
+        selected = edited_df[edited_df[''] == True].index.tolist()
+        
+        if selected:
+            if st.button(loc('delete'), type='secondary', key='delete_supports'):
+                if st.session_state.show_delete_confirm == 'supports':
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.supports.pop(idx)
                     st.session_state.show_delete_confirm = None
                     st.rerun()
-            with col2:
-                if st.button(loc('cancel'), key='cancel_support_delete', use_container_width=True):
+                else:
+                    st.session_state.show_delete_confirm = 'supports'
+                    st.warning(f"{loc('confirm_delete')} ({len(selected)} items)")
+            
+            if st.session_state.show_delete_confirm == 'supports':
+                if st.button(loc('confirm'), type='primary', key='confirm_supports'):
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.supports.pop(idx)
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
+                if st.button(loc('cancel'), key='cancel_supports'):
                     st.session_state.show_delete_confirm = None
                     st.rerun()
 
@@ -474,35 +502,45 @@ with data_tabs[2]:
 with data_tabs[3]:
     if st.session_state.loads:
         loads_df = pd.DataFrame([
-            {'Name': l.name, 'Node': l.node, 'Magnitude': l.magnitude, 'Angle': f"{l.angle}°"}
+            {'': False, 'Name': l.name, 'Node': l.node, 'Magnitude': l.magnitude, 'Angle': f"{l.angle}°"}
             for l in st.session_state.loads
         ])
-        st.dataframe(loads_df, use_container_width=True, hide_index=True)
         
-        load_names = [l.name for l in st.session_state.loads]
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            load_to_delete = st.selectbox(
-                "Select load to delete",
-                options=load_names,
-                key='delete_load_select',
-                label_visibility='collapsed'
-            )
-        with col2:
-            if st.button(loc('delete'), key='delete_load_btn', use_container_width=True):
-                st.session_state.show_delete_confirm = 'load'
+        edited_df = st.data_editor(
+            loads_df,
+            column_config={
+                '': st.column_config.CheckboxColumn('Select'),
+                'Name': 'Name',
+                'Node': 'Node',
+                'Magnitude': st.column_config.NumberColumn('Magnitude', format="%.2f"),
+                'Angle': 'Angle'
+            },
+            hide_index=True,
+            use_container_width=True,
+            disabled=['Name', 'Node', 'Magnitude', 'Angle'],
+            key='loads_editor'
+        )
         
-        if st.session_state.show_delete_confirm == 'load':
-            st.warning(f"{loc('confirm_delete')} ({load_to_delete})")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(loc('confirm'), key='confirm_load_delete', use_container_width=True):
-                    idx = next(i for i, l in enumerate(st.session_state.loads) if l.name == load_to_delete)
-                    st.session_state.loads.pop(idx)
+        selected = edited_df[edited_df[''] == True].index.tolist()
+        
+        if selected:
+            if st.button(loc('delete'), type='secondary', key='delete_loads'):
+                if st.session_state.show_delete_confirm == 'loads':
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.loads.pop(idx)
                     st.session_state.show_delete_confirm = None
                     st.rerun()
-            with col2:
-                if st.button(loc('cancel'), key='cancel_load_delete', use_container_width=True):
+                else:
+                    st.session_state.show_delete_confirm = 'loads'
+                    st.warning(f"{loc('confirm_delete')} ({len(selected)} items)")
+            
+            if st.session_state.show_delete_confirm == 'loads':
+                if st.button(loc('confirm'), type='primary', key='confirm_loads'):
+                    for idx in sorted(selected, reverse=True):
+                        st.session_state.loads.pop(idx)
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
+                if st.button(loc('cancel'), key='cancel_loads'):
                     st.session_state.show_delete_confirm = None
                     st.rerun()
 
