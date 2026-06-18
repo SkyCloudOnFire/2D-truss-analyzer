@@ -372,24 +372,33 @@ with data_tabs[0]:
         ])
         st.dataframe(nodes_df, use_container_width=True, hide_index=True)
         
-        # Delete functionality
-        for i, node in enumerate(st.session_state.nodes):
-            col1, col2 = st.columns([4, 1])
-            with col2:
-                if st.button(loc('delete'), key=f'del_node_{i}'):
-                    if st.session_state.show_delete_confirm == f'node_{i}':
-                        st.session_state.nodes.pop(i)
-                        st.session_state.show_delete_confirm = None
-                        st.rerun()
-                    else:
-                        st.session_state.show_delete_confirm = f'node_{i}'
-                        st.warning(loc('confirm_delete'))
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            node_to_delete = st.selectbox(
+                "Select node to delete",
+                options=[n.name for n in st.session_state.nodes],
+                key='delete_node_select',
+                label_visibility='collapsed'
+            )
+        with col2:
+            if st.button(loc('delete'), key='delete_node_btn', use_container_width=True):
+                st.session_state.show_delete_confirm = 'node'
+                st.session_state.node_to_delete = node_to_delete
+                st.rerun()
+        
+        if st.session_state.show_delete_confirm == 'node':
+            st.warning(f"{loc('confirm_delete')} ({st.session_state.node_to_delete})")
+            col1, col2 = st.columns(2)
             with col1:
-                if st.session_state.show_delete_confirm == f'node_{i}':
-                    if st.button(loc('confirm'), key=f'confirm_node_{i}'):
-                        st.session_state.nodes.pop(i)
-                        st.session_state.show_delete_confirm = None
-                        st.rerun()
+                if st.button(loc('confirm'), key='confirm_node_delete', use_container_width=True):
+                    node_name = st.session_state.node_to_delete
+                    st.session_state.nodes = [n for n in st.session_state.nodes if n.name != node_name]
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
+            with col2:
+                if st.button(loc('cancel'), key='cancel_node_delete', use_container_width=True):
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
 
 # Members Table
 with data_tabs[1]:
@@ -400,13 +409,33 @@ with data_tabs[1]:
         ])
         st.dataframe(members_df, use_container_width=True, hide_index=True)
         
-        for i, member in enumerate(st.session_state.members):
-            col1, col2 = st.columns([4, 1])
-            with col2:
-                if st.button(loc('delete'), key=f'del_member_{i}'):
-                    st.session_state.members.pop(i)
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            member_to_delete = st.selectbox(
+                "Select member to delete",
+                options=[m.name for m in st.session_state.members],
+                key='delete_member_select',
+                label_visibility='collapsed'
+            )
+        with col2:
+            if st.button(loc('delete'), key='delete_member_btn', use_container_width=True):
+                st.session_state.show_delete_confirm = 'member'
+                st.session_state.member_to_delete = member_to_delete
+                st.rerun()
+        
+        if st.session_state.show_delete_confirm == 'member':
+            st.warning(f"{loc('confirm_delete')} ({st.session_state.member_to_delete})")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(loc('confirm'), key='confirm_member_delete', use_container_width=True):
+                    member_name = st.session_state.member_to_delete
+                    st.session_state.members = [m for m in st.session_state.members if m.name != member_name]
+                    st.session_state.show_delete_confirm = None
                     st.rerun()
-
+            with col2:
+                if st.button(loc('cancel'), key='cancel_member_delete', use_container_width=True):
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
 # Supports Table
 with data_tabs[2]:
     if st.session_state.supports:
@@ -416,11 +445,36 @@ with data_tabs[2]:
         ])
         st.dataframe(supports_df, use_container_width=True, hide_index=True)
         
-        for i, support in enumerate(st.session_state.supports):
-            col1, col2 = st.columns([4, 1])
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            support_options = [f"{s.node} ({loc(s.type)})" for s in st.session_state.supports]
+            support_to_delete = st.selectbox(
+                "Select support to delete",
+                options=support_options,
+                key='delete_support_select',
+                label_visibility='collapsed'
+            )
+        with col2:
+            if st.button(loc('delete'), key='delete_support_btn', use_container_width=True):
+                st.session_state.show_delete_confirm = 'support'
+                st.session_state.support_to_delete = support_to_delete
+                st.rerun()
+        
+        if st.session_state.show_delete_confirm == 'support':
+            st.warning(f"{loc('confirm_delete')} ({st.session_state.support_to_delete})")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(loc('confirm'), key='confirm_support_delete', use_container_width=True):
+                    target = st.session_state.support_to_delete
+                    for i, s in enumerate(st.session_state.supports):
+                        if f"{s.node} ({loc(s.type)})" == target:
+                            st.session_state.supports.pop(i)
+                            break
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
             with col2:
-                if st.button(loc('delete'), key=f'del_support_{i}'):
-                    st.session_state.supports.pop(i)
+                if st.button(loc('cancel'), key='cancel_support_delete', use_container_width=True):
+                    st.session_state.show_delete_confirm = None
                     st.rerun()
 
 # Loads Table
@@ -432,11 +486,32 @@ with data_tabs[3]:
         ])
         st.dataframe(loads_df, use_container_width=True, hide_index=True)
         
-        for i, load in enumerate(st.session_state.loads):
-            col1, col2 = st.columns([4, 1])
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            load_to_delete = st.selectbox(
+                "Select load to delete",
+                options=[l.name for l in st.session_state.loads],
+                key='delete_load_select',
+                label_visibility='collapsed'
+            )
+        with col2:
+            if st.button(loc('delete'), key='delete_load_btn', use_container_width=True):
+                st.session_state.show_delete_confirm = 'load'
+                st.session_state.load_to_delete = load_to_delete
+                st.rerun()
+        
+        if st.session_state.show_delete_confirm == 'load':
+            st.warning(f"{loc('confirm_delete')} ({st.session_state.load_to_delete})")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(loc('confirm'), key='confirm_load_delete', use_container_width=True):
+                    load_name = st.session_state.load_to_delete
+                    st.session_state.loads = [l for l in st.session_state.loads if l.name != load_name]
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
             with col2:
-                if st.button(loc('delete'), key=f'del_load_{i}'):
-                    st.session_state.loads.pop(i)
+                if st.button(loc('cancel'), key='cancel_load_delete', use_container_width=True):
+                    st.session_state.show_delete_confirm = None
                     st.rerun()
 
 # Action Buttons
