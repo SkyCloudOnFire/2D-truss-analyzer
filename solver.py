@@ -123,13 +123,12 @@ class TrussSolver:
         T = self._create_transformation_matrix(cx, cy)
         return T.T @ k_local @ T
     
-    def _apply_support_constraints(self) -> Tuple[np.ndarray, List[bool]]:
+    def _get_constrained_dofs(self) -> List[int]:
         """
-        Apply support constraints and return constrained stiffness matrix.
-        Returns the modified K matrix and a boolean list of constrained DOFs.
+        Get list of constrained DOF indices based on support conditions.
+        Returns list of DOF indices that are fixed.
         """
-        total_dofs = len(self.nodes) * 2
-        constrained_dofs = [False] * total_dofs
+        constrained_dofs = []
         
         for support in self.supports:
             node_name = support.node
@@ -139,21 +138,24 @@ class TrussSolver:
             dof_x, dof_y = self._get_node_dofs(node_name)
             angle_rad = math.radians(support.angle)
             
-            # Transform support conditions based on angle
             if support.type == 'fixed':
-                constrained_dofs[dof_x] = True
-                constrained_dofs[dof_y] = True
+                # Fixed: constrain both X and Y
+                constrained_dofs.extend([dof_x, dof_y])
             elif support.type == 'pinned':
-                constrained_dofs[dof_x] = True
-                constrained_dofs[dof_y] = True
+                # Pinned: constrain both X and Y (like fixed for 2D truss)
+                constrained_dofs.extend([dof_x, dof_y])
             elif support.type == 'roller':
-                # Roller allows movement along the support surface (perpendicular to angle)
-                # Constrain DOF in the direction of the angle
-                # Simplified: constrain the direction with larger projection
-                if abs(math.cos(angle_rad)) > abs(math.sin(angle_rad)):
-                    constrained_dofs[dof_x] = True
+                # Roller: constrain perpendicular to the rolling direction
+                # The roller allows movement ALONG the support surface
+                # Support angle defines the direction of the normal (constrained direction)
+                normal_x = math.cos(angle_rad)
+                normal_y = math.sin(angle_rad)
+                
+                # If normal is closer to X direction, constrain X
+                if abs(normal_x) > abs(normal_y):
+                    constrained_dofs.append(dof_x)
                 else:
-                    constrained_dofs[dof_y] = True
+                    constrained_dofs.append(dof_y)
         
         return constrained_dofs
     
@@ -165,8 +167,9 @@ class TrussSolver:
         try:
             total_dofs = len(self.nodes) * 2
             
-            # Initialize global stiffness matrix
+            # Initialize global stiffness matrix and force vector
             K_global = np.zeros((total_dofs, total_dofs))
+            F = np.zeros(total_dofs)
             
             # Assemble global stiffness matrix
             for member in self.members:
@@ -183,12 +186,7 @@ class TrussSolver:
                     for j in range(4):
                         K_global[indices[i], indices[j]] += k_global_member[i, j]
             
-            # Apply support constraints
-            constrained_dofs = self._apply_support_constraints()
-            free_dofs = [i for i in range(total_dofs) if not constrained_dofs[i]]
-            
             # Build force vector
-            F = np.zeros(total_dofs)
             for load in self.loads:
                 if load.node not in self.nodes:
                     continue
@@ -197,20 +195,33 @@ class TrussSolver:
                 F[dof_x] += load.magnitude * math.cos(angle_rad)
                 F[dof_y] += load.magnitude * math.sin(angle_rad)
             
+            # Get constrained DOFs
+            constrained_dofs = self._get_constrained_dofs()
+            constrained_dofs = sorted(set(constrained_dofs))  # Remove duplicates and sort
+            free_dofs = [i for i in range(total_dofs) if i not in constrained_dofs]
+            
+            if not free_dofs:
+                return False  # All DOFs constrained
+            
             # Extract free DOF submatrices
             K_ff = K_global[np.ix_(free_dofs, free_dofs)]
+            K_fc = K_global[np.ix_(free_dofs, constrained_dofs)]
+            K_cf = K_global[np.ix_(constrained_dofs, free_dofs)]
+            K_cc = K_global[np.ix_(constrained_dofs, constrained_dofs)]
+            
             F_f = F[free_dofs]
             
             # Check for singularity
             if np.linalg.cond(K_ff) > 1e12:
                 return False
             
-            # Solve for displacements
+            # Solve for displacements (free DOFs only)
             U_f = np.linalg.solve(K_ff, F_f)
             
             # Reconstruct full displacement vector
             U = np.zeros(total_dofs)
             U[free_dofs] = U_f
+            # Constrained DOFs have zero displacement (already zero)
             
             # Store displacements
             self.displacements = {}
@@ -218,14 +229,27 @@ class TrussSolver:
                 dof_x, dof_y = self._get_node_dofs(node_name)
                 self.displacements[node_name] = np.array([U[dof_x], U[dof_y]])
             
-            # Calculate reactions
+            # Calculate reactions using the FULL stiffness matrix
+            # Reactions = K * U - F_applied (for constrained DOFs)
             self.reactions = {}
+            
+            # Method: R = K * U (gives forces at all DOFs)
+            all_forces = K_global @ U
+            
+            # Reactions are the forces at constrained DOFs
+            # But we need to subtract any applied loads at those DOFs
             for support in self.supports:
                 node_name = support.node
                 if node_name not in self.nodes:
                     continue
+                
                 dof_x, dof_y = self._get_node_dofs(node_name)
-                self.reactions[node_name] = np.array([-F[dof_x], -F[dof_y]])
+                
+                # Reaction = Internal force - Applied load at that DOF
+                rx = all_forces[dof_x] - F[dof_x]
+                ry = all_forces[dof_y] - F[dof_y]
+                
+                self.reactions[node_name] = np.array([rx, ry])
             
             # Calculate member forces
             self.member_forces = {}
@@ -237,11 +261,11 @@ class TrussSolver:
                 length = self._calculate_member_length(member)
                 EA = 1.0
                 
-                # Transform to local coordinates and calculate force
+                # Get displacements at both ends
                 start_disp = self.displacements[member.start_node]
                 end_disp = self.displacements[member.end_node]
                 
-                # Local displacement
+                # Transform to local coordinates
                 u_local_start = cx * start_disp[0] + cy * start_disp[1]
                 u_local_end = cx * end_disp[0] + cy * end_disp[1]
                 
@@ -277,15 +301,15 @@ class TrussSolver:
         
         # Check for nodes
         if not self.nodes:
-            errors.append('no_nodes')
+            errors.append('No nodes defined')
         
         # Check for members
         if not self.members:
-            errors.append('no_members')
+            errors.append('No members defined')
         
         # Check for supports
         if not self.supports:
-            errors.append('no_supports')
+            errors.append('No supports defined')
         
         # Check member connections
         for member in self.members:
@@ -294,7 +318,7 @@ class TrussSolver:
             if member.end_node not in self.nodes:
                 errors.append(f"Member {member.name}: End node '{member.end_node}' not found")
             if member.start_node == member.end_node:
-                errors.append(f"Member {member.name}: Zero-length member (same start and end node)")
+                errors.append(f"Member {member.name}: Zero-length member")
         
         # Check load nodes exist
         for load in self.loads:
