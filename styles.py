@@ -101,25 +101,26 @@ def get_css(theme: Literal['light', 'dark']) -> str:
             box-shadow: {colors['shadow']};
         }}
         
-        /* Button Styles */
+        /* Button Styles - Reset all states */
 .stButton > button {{
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 0.875rem;
-    padding: 0.5rem 1rem;
-    transition: all 0.2s ease;
-    border: 1px solid {colors['border']};
-    background-color: {colors['bg_card']};
-    color: {colors['text_primary']};
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    font-size: 0.875rem !important;
+    padding: 0.5rem 1rem !important;
+    transition: all 0.2s ease !important;
+    border: 1px solid {colors['border']} !important;
+    background-color: {colors['bg_card']} !important;
+    color: {colors['text_primary']} !important;
 }}
 
 .stButton > button:hover {{
-    border-color: {colors['accent']};
-    color: {colors['accent']};
+    border-color: {colors['accent']} !important;
+    color: {colors['accent']} !important;
+    background-color: {colors['bg_card']} !important;
 }}
 
 .stButton > button:active {{
-    transform: scale(0.98);
+    transform: scale(0.98) !important;
     background-color: {colors['success']} !important;
     border-color: {colors['success']} !important;
     color: white !important;
@@ -128,29 +129,47 @@ def get_css(theme: Literal['light', 'dark']) -> str:
 .stButton > button:focus {{
     outline: none !important;
     box-shadow: none !important;
+    background-color: {colors['bg_card']} !important;
+    border-color: {colors['border']} !important;
+    color: {colors['text_primary']} !important;
 }}
 
 .stButton > button:focus-visible {{
     outline: 2px solid {colors['accent']} !important;
     outline-offset: 2px;
+    background-color: {colors['bg_card']} !important;
+    border-color: {colors['border']} !important;
+    color: {colors['text_primary']} !important;
 }}
 
-/* Primary Button */
-.primary-button > button {{
-    background-color: {colors['accent']};
-    color: white;
-    border: none;
-    font-weight: 600;
+.stButton > button:visited {{
+    background-color: {colors['bg_card']} !important;
+    border-color: {colors['border']} !important;
+    color: {colors['text_primary']} !important;
 }}
 
-.primary-button > button:hover {{
-    background-color: {colors['accent_hover']};
-    color: white;
+/* Primary Button - Reset all states */
+.stButton > button[kind="primary"] {{
+    background-color: {colors['accent']} !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600 !important;
 }}
 
-.primary-button > button:active {{
+.stButton > button[kind="primary"]:hover {{
+    background-color: {colors['accent_hover']} !important;
+    color: white !important;
+}}
+
+.stButton > button[kind="primary"]:active {{
     background-color: {colors['success']} !important;
-    border-color: {colors['success']} !important;
+    color: white !important;
+}}
+
+.stButton > button[kind="primary"]:focus {{
+    outline: none !important;
+    box-shadow: none !important;
+    background-color: {colors['accent']} !important;
     color: white !important;
 }}
         
