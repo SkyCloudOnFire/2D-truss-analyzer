@@ -190,6 +190,8 @@ with tab_members:
             start_node = st.selectbox(
                 loc('member_start'),
                 options=node_names,
+                index=None,
+                placeholder=loc('select_node'),
                 key='input_member_start'
             )
         
@@ -197,6 +199,8 @@ with tab_members:
             end_node = st.selectbox(
                 loc('member_end'),
                 options=node_names,
+                index=None,
+                placeholder=loc('select_node'),
                 key='input_member_end'
             )
         
@@ -220,7 +224,8 @@ with tab_members:
                         st.session_state.members.append(new_member)
                         st.rerun()
 
-# Support Input Tab
+# Support Input Ta
+
 with tab_supports:
     st.markdown("### " + loc('tab_supports'))
     
