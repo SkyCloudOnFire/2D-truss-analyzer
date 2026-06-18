@@ -148,19 +148,21 @@ with tab_nodes:
     with col2:
         node_x = st.number_input(
             loc('node_x'),
-            value=0.0,
+            value=none,
             step=0.5,
             format="%.2f",
-            key='input_node_x'
+            key='input_node_x',
+            placeholder="0.00"
         )
     
     with col3:
         node_y = st.number_input(
             loc('node_y'),
-            value=0.0,
+            value=none,
             step=0.5,
             format="%.2f",
-            key='input_node_y'
+            key='input_node_y',
+            placeholder="0.00"
         )
     
     if st.button(loc('add_node'), use_container_width=True, type='primary'):
@@ -247,9 +249,10 @@ with tab_supports:
         with col3:
             support_angle = st.number_input(
                 loc('support_angle'),
-                value=0.0,
+                value=none,
                 step=15.0,
                 format="%.1f",
+                placeholder="0.00",
                 key='input_support_angle'
             )
         
@@ -295,19 +298,21 @@ with tab_loads:
         with col3:
             load_magnitude = st.number_input(
                 loc('load_magnitude'),
-                value=1.0,
+                value=none,
                 step=0.5,
                 format="%.2f",
+                placeholder="0.00",
                 key='input_load_magnitude',
                 min_value=0.0
             )
         
         load_angle = st.number_input(
             loc('load_angle'),
-            value=0.0,
+            value=none,
             step=15.0,
             format="%.1f",
-            key='input_load_angle'
+            key='input_load_angle',
+            placeholder="0.00"
         )
         
         if st.button(loc('add_load'), use_container_width=True, type='primary'):
