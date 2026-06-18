@@ -120,26 +120,22 @@ def get_css(theme: Literal['light', 'dark']) -> str:
 
 .stButton > button:active {{
     transform: scale(0.98);
-    background-color: {colors['accent']} !important;
-    border-color: {colors['accent']} !important;
+    background-color: {colors['success']} !important;
+    border-color: {colors['success']} !important;
     color: white !important;
 }}
 
 .stButton > button:focus {{
-    background-color: {colors['accent']} !important;
-    border-color: {colors['accent']} !important;
-    color: white !important;
     outline: none !important;
+    box-shadow: none !important;
 }}
 
-.stButton > button:focus:not(:focus-visible) {{
-    background-color: {colors['accent']} !important;
-    border-color: {colors['accent']} !important;
-    color: white !important;
-    outline: none !important;
+.stButton > button:focus-visible {{
+    outline: 2px solid {colors['accent']} !important;
+    outline-offset: 2px;
 }}
-        
-        /* Primary Button */
+
+/* Primary Button */
 .primary-button > button {{
     background-color: {colors['accent']};
     color: white;
@@ -150,6 +146,12 @@ def get_css(theme: Literal['light', 'dark']) -> str:
 .primary-button > button:hover {{
     background-color: {colors['accent_hover']};
     color: white;
+}}
+
+.primary-button > button:active {{
+    background-color: {colors['success']} !important;
+    border-color: {colors['success']} !important;
+    color: white !important;
 }}
         
         /* Input Fields - Text Input */
